@@ -1,0 +1,34 @@
+[package]
+name = "trindle-scan"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+authors = ["Trindle <distro@trindle.org>"]
+repository = "https://github.com/trindle-os/trindle-scan"
+license = "GPL-3.0-or-later"
+description = "Scanning for Trindle: find a network scanner, scan, tidy the pages, save as PDF or pictures"
+
+[dependencies]
+trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
+libc = "0.2"
+trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+sha2 = "0.10"
+flate2 = "1"
+tiff = "0.11"
+
+[build-dependencies]
+trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+
+[dev-dependencies]
+trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74", features = ["testing"] }
+tiny-skia = "0.12"
+tempfile = "3"
+
+[profile.release]
+overflow-checks = true
+strip = true
+lto = "thin"
+codegen-units = 1

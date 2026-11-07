@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360">
+  <rect width="1280" height="360" fill="#080e1c"/>
+  <rect x="24" y="24" width="1232" height="312" rx="28" fill="#15223d"/>
+  <g transform="translate(96 100) scale(3.6)">
+    <circle cx="30" cy="29.5" r="29" fill="#ffc914" transform="translate(-6 -5)"/>
+    <g stroke="#111827" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="translate(-8 -5.5)">
+      <rect x="12" y="28" width="40" height="17" rx="4"/>
+      <path d="M22 28V13h20v15"/>
+      <line x1="18" y1="36.5" x2="46" y2="36.5"/>
+    </g>
+  </g>
+  <text x="340" y="170" font-family="DejaVu Sans, sans-serif" font-size="84" font-weight="700" fill="#f4f6fb">Trindle Scan</text>
+  <text x="344" y="226" font-family="DejaVu Sans, sans-serif" font-size="32" fill="#b4bfd6">Find a scanner, scan, tidy the pages, save.</text>
+  <g font-family="DejaVu Sans, sans-serif" font-size="22" fill="#f4f6fb">
+    <rect x="344" y="262" width="144" height="42" rx="21" fill="#080e1c"/><text x="370" y="291">Network</text>
+    <rect x="504" y="262" width="100" height="42" rx="21" fill="#080e1c"/><text x="528" y="291">USB</text>
+    <rect x="620" y="262" width="230" height="42" rx="21" fill="#080e1c"/><text x="644" y="291">Searchable PDF</text>
+  </g>
+</svg>

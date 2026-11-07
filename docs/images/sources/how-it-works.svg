@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300">
+  <rect width="1280" height="300" fill="#080e1c"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#f4f6fb">
+    <rect x="40" y="40" width="360" height="220" rx="24" fill="#15223d"/>
+    <circle cx="84" cy="84" r="22" fill="#ffc914"/><text x="76" y="93" font-size="26" font-weight="700" fill="#111827">1</text>
+    <text x="120" y="92" font-size="30" font-weight="700">Press Scan</text>
+    <text x="72" y="150" font-size="22" fill="#b4bfd6">Your scanner is found on the</text>
+    <text x="72" y="182" font-size="22" fill="#b4bfd6">network or over USB.</text>
+    <text x="72" y="228" font-size="22" fill="#b4bfd6">Your profile sets the rest.</text>
+    <path d="M410 150h60m-16-16 16 16-16 16" stroke="#ffc914" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="480" y="40" width="320" height="220" rx="24" fill="#15223d"/>
+    <circle cx="524" cy="84" r="22" fill="#ffc914"/><text x="516" y="93" font-size="26" font-weight="700" fill="#111827">2</text>
+    <text x="560" y="92" font-size="30" font-weight="700">Tidy the pages</text>
+    <text x="512" y="150" font-size="22" fill="#b4bfd6">Rotate, crop, straighten,</text>
+    <text x="512" y="182" font-size="22" fill="#b4bfd6">reorder or delete.</text>
+    <path d="M810 150h60m-16-16 16 16-16 16" stroke="#ffc914" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="880" y="40" width="360" height="220" rx="24" fill="#15223d"/>
+    <circle cx="924" cy="84" r="22" fill="#ffc914"/><text x="916" y="93" font-size="26" font-weight="700" fill="#111827">3</text>
+    <text x="960" y="92" font-size="30" font-weight="700">Save</text>
+    <text x="912" y="150" font-size="22" fill="#b4bfd6">PDF, JPEG, PNG or TIFF,</text>
+    <text x="912" y="182" font-size="22" fill="#b4bfd6">by hand or into a folder.</text>
+  </g>
+</svg>

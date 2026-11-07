@@ -1,0 +1,34 @@
+# What `cargo deny check` holds the dependencies to: licences that sit with
+# GPL-3.0-or-later, crates.io and the Trindle toolkit as the only sources, and no known vulnerability.
+
+[graph]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[advisories]
+# A crate no longer looked after is flagged only when Scan names it itself.
+# zbus_names, zvariant and zvariant_derive (RUSTSEC-2026-0370, -0371, -0372)
+# come in only through the toolkit's zbus; Scan does not use them directly, and
+# the toolkit's own update replaces them.
+unmaintained = "workspace"
+
+[licenses]
+allow = [
+    "GPL-3.0-or-later",
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = ["https://github.com/trindle-os/trindle-toolkit"]
