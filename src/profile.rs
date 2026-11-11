@@ -1,9 +1,9 @@
 //! Profiles: a named bundle of scan settings and what happens afterwards, kept in the program's config folder.
 
+use crate::escl::{BLACK_WHITE, Caps, GREY, RGB, Settings};
 use crate::settings::BASE_DPI;
-use crate::escl::{Caps, Settings, BLACK_WHITE, GREY, RGB};
-use trindle_toolkit::t;
 use std::path::{Path, PathBuf};
+use trindle_toolkit::t;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Source {
@@ -186,7 +186,8 @@ impl Profile {
 
     pub fn settings(&self, caps: &Caps) -> (Settings, Vec<String>) {
         let mut told = Vec::new();
-        let (gw, gh) = caps.glass.unwrap_or((2480, 3508));
+        let by_feeder = self.source != Source::Glass && caps.feeder;
+        let (gw, gh) = by_feeder.then_some(caps.feeder_area).flatten().or(caps.glass).unwrap_or((2480, 3508));
         if caps.glass.is_none() {
             told.push(t!("scan-profile-told-glass").to_string());
         }
@@ -283,10 +284,23 @@ impl Profile {
                 "host" => p.host = v.into(),
                 "port" => p.port = v.parse().unwrap_or(80),
                 "root" => p.root = v.into(),
-                "source" => p.source = match v { "feeder" => Source::Feeder, "both" => Source::FeederBoth, "manual" => Source::FeederManualBoth, _ => Source::Glass },
+                "source" => {
+                    p.source = match v {
+                        "feeder" => Source::Feeder,
+                        "both" => Source::FeederBoth,
+                        "manual" => Source::FeederManualBoth,
+                        _ => Source::Glass,
+                    }
+                }
                 "size" => p.size = Size::from_key(v),
                 "dpi" => p.dpi = (n as u32).clamp(75, 1200),
-                "colour" => p.colour = match v { "grey" => Colour::Grey, "bw" => Colour::BlackWhite, _ => Colour::Full },
+                "colour" => {
+                    p.colour = match v {
+                        "grey" => Colour::Grey,
+                        "bw" => Colour::BlackWhite,
+                        _ => Colour::Full,
+                    }
+                }
                 "threshold" => p.threshold = (n as i32).clamp(0, 100),
                 "brightness" => p.brightness = (n as i32).clamp(-100, 100),
                 "contrast" => p.contrast = (n as i32).clamp(-100, 100),
@@ -411,6 +425,9 @@ impl Book {
         } else if self.default > i {
             self.default -= 1;
         }
+        if self.current > i {
+            self.current -= 1;
+        }
         self.current = self.current.min(self.profiles.len().saturating_sub(1));
     }
 
@@ -422,13 +439,16 @@ impl Book {
         let j = j as usize;
         self.profiles.swap(i, j);
         for x in [&mut self.default, &mut self.current] {
-            if *x == i { *x = j } else if *x == j { *x = i }
+            if *x == i {
+                *x = j
+            } else if *x == j {
+                *x = i
+            }
         }
     }
 }
 
 impl Profile {
-
     pub fn changes_pixels(&self) -> bool {
         self.rotate != 0 || self.straighten || self.trim || self.brightness != 0 || self.contrast != 0 || self.colour != Colour::Full || self.skip_blank
     }
@@ -474,6 +494,21 @@ mod tests {
     }
 
     #[test]
+    fn deleting_a_profile_above_the_one_in_use_keeps_that_one_in_use() {
+        crate::words::ready();
+        let mut b = Book::first_run();
+        for n in ["A", "B", "C"] {
+            b.add(Profile::new(n));
+        }
+        b.current = 2;
+        let name = b.now().unwrap().name.clone();
+        b.delete(0);
+        assert_eq!(b.now().unwrap().name, name);
+        b.delete(1);
+        assert_eq!(b.current, 0);
+    }
+
+    #[test]
     fn a_profile_called_profile_is_one_profile() {
         crate::words::ready();
         let d = tmp("tag");
@@ -499,6 +534,20 @@ mod tests {
         assert!(!s.feeder);
         assert_eq!(s.dpi, 200);
         assert_eq!(told.len(), 2);
+    }
+
+    #[test]
+    fn a_legal_page_through_the_feeder_is_not_cut_to_the_glass() {
+        crate::words::ready();
+        let caps = Caps { glass: Some((2480, 3508)), feeder: true, feeder_area: Some((2550, 4200)), colour: true, ..Caps::default() };
+        let mut p = Profile::new("x");
+        p.size = Size::Legal;
+        p.source = Source::Feeder;
+        let (s, told) = p.settings(&caps);
+        assert_eq!((s.width, s.height), Size::Legal.area().unwrap());
+        assert!(told.is_empty());
+        p.source = Source::Glass;
+        assert_eq!(p.settings(&caps).0.height, 3508);
     }
 
     #[test]

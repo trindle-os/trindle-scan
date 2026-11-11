@@ -45,6 +45,8 @@ pub struct Browse {
     pub new_folder: String,
     pub picked: Vec<PathBuf>,
     pub error: Option<String>,
+
+    pub listing: Vec<Row>,
 }
 
 pub fn roots() -> Vec<PathBuf> {
@@ -62,7 +64,9 @@ pub fn is_picture(p: &Path) -> bool {
 impl Browse {
     pub fn new(purpose: Purpose, start: Option<PathBuf>, roots: &[PathBuf]) -> Browse {
         let dir = start.filter(|d| d.is_dir() && roots.iter().any(|r| d.starts_with(r)));
-        Browse { purpose, dir, name: format!("{}.pdf", t!("scan-browse-default-name")), new_folder: String::new(), picked: Vec::new(), error: None }
+        let mut b = Browse { purpose, dir, name: format!("{}.pdf", t!("scan-browse-default-name")), new_folder: String::new(), picked: Vec::new(), error: None, listing: Vec::new() };
+        b.listing = b.rows(roots);
+        b
     }
 
     pub fn rows(&self, roots: &[PathBuf]) -> Vec<Row> {
@@ -93,13 +97,15 @@ impl Browse {
         self.error = None;
         let Some(dir) = self.dir.clone() else { return };
         self.dir = if roots.contains(&dir) { None } else { dir.parent().map(|p| p.to_path_buf()).filter(|p| roots.iter().any(|r| p.starts_with(r))) };
+        self.listing = self.rows(roots);
     }
 
     pub fn pick(&mut self, i: usize, roots: &[PathBuf]) {
         self.error = None;
-        let Some(row) = self.rows(roots).get(i).cloned() else { return };
+        let Some(row) = self.listing.get(i).cloned() else { return };
         if row.folder {
             self.dir = Some(row.path);
+            self.listing = self.rows(roots);
         } else if let Some(at) = self.picked.iter().position(|p| *p == row.path) {
             self.picked.remove(at);
         } else {
@@ -120,6 +126,7 @@ impl Browse {
         match std::fs::create_dir(dir.join(&name)) {
             Ok(()) => {
                 self.dir = Some(dir.join(name));
+                self.listing = self.rows(&[]);
                 self.new_folder.clear();
                 self.error = None;
             }
@@ -208,6 +215,19 @@ mod tests {
         assert!(b.error.is_some());
         b.name = "../x".into();
         assert!(b.confirm().is_none());
+    }
+
+    #[test]
+    fn the_folder_is_read_when_it_changes_and_not_when_it_is_drawn() {
+        crate::words::ready();
+        let home = tmp("listing");
+        let roots = roots_in(&home);
+        let mut b = Browse::new(Purpose::Pictures, Some(home.join("Pictures")), &roots);
+        std::fs::write(home.join("Pictures/late.png"), b"x").unwrap();
+        assert!(b.listing.is_empty(), "a file added later is not seen until the folder is entered again");
+        b.up(&roots);
+        b.pick(b.listing.iter().position(|r| r.path.ends_with("Pictures")).unwrap(), &roots);
+        assert_eq!(b.listing.len(), 1);
     }
 
     #[test]

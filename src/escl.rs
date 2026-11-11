@@ -18,6 +18,8 @@ pub struct Caps {
     pub model: String,
 
     pub glass: Option<(u32, u32)>,
+
+    pub feeder_area: Option<(u32, u32)>,
     pub feeder: bool,
     pub two_sided: bool,
     pub resolutions: Vec<u32>,
@@ -28,7 +30,6 @@ pub struct Caps {
 
 #[derive(Debug, PartialEq)]
 pub enum Fail {
-
     Offline(String),
     Busy,
     NoPaper,
@@ -79,7 +80,18 @@ fn plain(s: &str, allowed: &str) -> bool {
     s.chars().all(|c| c.is_ascii_alphanumeric() || allowed.contains(c))
 }
 
-const LONGEST_REPLY: usize = 512 << 20;
+pub(crate) const LONGEST_REPLY: usize = 512 << 20;
+
+const WARM_TRIES: u32 = 30;
+
+fn pause(stop: &impl Fn() -> bool) {
+    for _ in 0..10 {
+        if stop() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
 
 impl Scanner {
     fn base(&self) -> String {
@@ -94,11 +106,8 @@ impl Scanner {
         if !plain(path, "._~/-") || !plain(&self.host, ".:-[]%") {
             return Err(Fail::Other(t!("scan-escl-detail-unsafe").into()));
         }
-        let addr: SocketAddr = (self.host.as_str(), self.port)
-            .to_socket_addrs()
-            .map_err(|e| Fail::Offline(e.to_string()))?
-            .next()
-            .ok_or_else(|| Fail::Offline(t!("scan-escl-detail-no-address").into()))?;
+        let addr: SocketAddr =
+            (self.host.as_str(), self.port).to_socket_addrs().map_err(|e| Fail::Offline(e.to_string()))?.next().ok_or_else(|| Fail::Offline(t!("scan-escl-detail-no-address").into()))?;
         if !may_connect(addr.ip()) {
             return Err(Fail::NotPrivate);
         }
@@ -184,6 +193,7 @@ impl Scanner {
         let job = r.location.ok_or_else(|| Fail::Other(t!("scan-escl-detail-no-job").into()))?;
         let job = job.split_once("://").map(|(_, rest)| rest.find('/').map(|i| rest[i..].to_string()).unwrap_or_default()).unwrap_or(job);
         let mut n = 0;
+        let mut warm = 0;
         let end = loop {
             if stop() {
                 break Ok(n);
@@ -196,6 +206,10 @@ impl Scanner {
                     }
                     404 | 410 => return Ok(n),
                     503 if n > 0 => return Ok(n),
+                    503 if warm < WARM_TRIES && !matches!(self.why_busy(), Fail::NoPaper | Fail::Jam) => {
+                        warm += 1;
+                        pause(&stop);
+                    }
                     503 => break Err(self.why_busy()),
                     code => break Err(Fail::Other(t!("scan-escl-detail-stopped", code = code))),
                 },
@@ -222,7 +236,6 @@ pub const BLACK_WHITE: &str = "BlackAndWhite1";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
-
     pub width: u32,
     pub height: u32,
     pub dpi: u32,
@@ -236,7 +249,12 @@ impl Settings {
     pub fn xml(&self) -> String {
         format!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<scan:ScanSettings xmlns:pwg=\"http://www.pwg.org/schemas/2010/12/sm\" xmlns:scan=\"http://schemas.hp.com/imaging/escl/2011/05/03\"><pwg:Version>2.0</pwg:Version><pwg:ScanRegions><pwg:ScanRegion><pwg:Height>{}</pwg:Height><pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits><pwg:Width>{}</pwg:Width><pwg:XOffset>0</pwg:XOffset><pwg:YOffset>0</pwg:YOffset></pwg:ScanRegion></pwg:ScanRegions><pwg:InputSource>{}</pwg:InputSource><scan:ColorMode>{}</scan:ColorMode><scan:XResolution>{}</scan:XResolution><scan:YResolution>{}</scan:YResolution><pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>{}</scan:ScanSettings>",
-            self.height, self.width, if self.feeder { "Feeder" } else { "Platen" }, self.mode, self.dpi, self.dpi,
+            self.height,
+            self.width,
+            if self.feeder { "Feeder" } else { "Platen" },
+            self.mode,
+            self.dpi,
+            self.dpi,
             if self.feeder && self.duplex { "<scan:Duplex>true</scan:Duplex>" } else { "" }
         )
     }
@@ -249,16 +267,21 @@ fn parse_reply(raw: &[u8]) -> Result<Reply, Fail> {
     let status = lines.next().and_then(|l| l.split_whitespace().nth(1)).and_then(|c| c.parse().ok()).ok_or_else(|| Fail::Other(t!("scan-escl-detail-broken").into()))?;
     let mut location = None;
     let mut chunked = false;
+    let mut declared = None;
     for l in lines {
         if let Some((k, v)) = l.split_once(':') {
             match k.trim().to_ascii_lowercase().as_str() {
                 "location" => location = Some(v.trim().to_string()),
+                "content-length" => declared = v.trim().parse::<usize>().ok(),
                 "transfer-encoding" => chunked = v.to_ascii_lowercase().contains("chunked"),
                 _ => {}
             }
         }
     }
     let rest = &raw[end + 4..];
+    if !chunked && declared.is_some_and(|d| rest.len() < d) {
+        return Err(Fail::Other(t!("scan-escl-detail-broken").into()));
+    }
     let body = if chunked { dechunk(rest) } else { rest.to_vec() };
     Ok(Reply { status, location, body })
 }
@@ -309,9 +332,15 @@ fn first(xml: &str, tag: &str) -> Option<String> {
 pub fn parse_caps(xml: &str) -> Caps {
     let mut c = Caps { model: first(xml, "MakeAndModel").unwrap_or_default(), ..Caps::default() };
     if let Some(p) = all(xml, "PlatenInputCaps").first()
-        && let (Some(w), Some(h)) = (first(p, "MaxWidth"), first(p, "MaxHeight")) {
-            c.glass = w.parse().ok().zip(h.parse().ok());
-        }
+        && let (Some(w), Some(h)) = (first(p, "MaxWidth"), first(p, "MaxHeight"))
+    {
+        c.glass = w.parse().ok().zip(h.parse().ok());
+    }
+    if let Some(p) = all(xml, "AdfSimplexInputCaps").first()
+        && let (Some(w), Some(h)) = (first(p, "MaxWidth"), first(p, "MaxHeight"))
+    {
+        c.feeder_area = w.parse().ok().zip(h.parse().ok());
+    }
     let adf = all(xml, "Adf");
     c.feeder = !adf.is_empty();
     c.two_sided = adf.iter().any(|a| a.contains("AdfDuplexInputCaps"));
@@ -321,8 +350,9 @@ pub fn parse_caps(xml: &str) -> Caps {
     c.black_white = modes.contains(BLACK_WHITE);
     let mut res: Vec<u32> = all(xml, "XResolution").iter().filter_map(|r| r.trim().parse().ok()).collect();
     if res.is_empty() {
-        let lo = first(xml, "Min").and_then(|v| v.parse::<u32>().ok());
-        let hi = first(xml, "Max").and_then(|v| v.parse::<u32>().ok());
+        let range = all(xml, "XResolutionRange").into_iter().next().unwrap_or_default();
+        let lo = first(&range, "Min").and_then(|v| v.parse::<u32>().ok());
+        let hi = first(&range, "Max").and_then(|v| v.parse::<u32>().ok());
         if let (Some(lo), Some(hi)) = (lo, hi) {
             res = [75, 100, 150, 200, 300, 400, 600, 1200].into_iter().filter(|r| *r >= lo && *r <= hi).collect();
         }
@@ -409,6 +439,62 @@ pub(crate) mod tests {
         let mut got = Vec::new();
         let n = s.scan(&set, || false, |p| got.push(p)).unwrap();
         assert_eq!((n, got.len()), (2, 2));
+    }
+
+    #[test]
+    fn a_503_to_the_first_page_is_asked_again() {
+        crate::words::ready();
+        let l = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let mut next = 0;
+            for s in l.incoming() {
+                let mut s = s.unwrap();
+                let mut buf = [0u8; 4096];
+                let n = s.read(&mut buf).unwrap();
+                let req = String::from_utf8_lossy(&buf[..n]).into_owned();
+                let line = req.lines().next().unwrap_or("").to_string();
+                let out: Vec<u8> = if line.starts_with("POST /eSCL/ScanJobs") {
+                    b"HTTP/1.1 201 Created\r\nLocation: /eSCL/ScanJobs/7\r\nContent-Length: 0\r\n\r\n".to_vec()
+                } else if line.starts_with("GET /eSCL/ScannerStatus") {
+                    let x = "<s:State>Processing</s:State><s:AdfState>ScannerAdfLoaded</s:AdfState>";
+                    format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{x}", x.len()).into_bytes()
+                } else if line.starts_with("GET /eSCL/ScanJobs/7/NextDocument") {
+                    next += 1;
+                    match next {
+                        1 => b"HTTP/1.1 503 Busy\r\nContent-Length: 0\r\n\r\n".to_vec(),
+                        2 => b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n\xFF\xD8\xFF\xD9".to_vec(),
+                        _ => b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".to_vec(),
+                    }
+                } else {
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec()
+                };
+                s.write_all(&out).unwrap();
+            }
+        });
+        let s = Scanner { name: "x".into(), host: "127.0.0.1".into(), port, root: "eSCL".into() };
+        let set = Settings { width: 2480, height: 3508, dpi: 300, mode: "RGB24", feeder: false, duplex: false };
+        assert_eq!(s.scan(&set, || false, |_| {}).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_body_shorter_than_its_length_is_refused() {
+        crate::words::ready();
+        assert!(parse_reply(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nabc").is_err());
+        assert_eq!(parse_reply(b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc").unwrap().body, b"abc");
+    }
+
+    #[test]
+    fn the_feeders_own_largest_page_is_read() {
+        let xml = "<a><PlatenInputCaps><MaxWidth>2480</MaxWidth><MaxHeight>3508</MaxHeight></PlatenInputCaps><Adf><AdfSimplexInputCaps><MaxWidth>2550</MaxWidth><MaxHeight>4200</MaxHeight></AdfSimplexInputCaps></Adf></a>";
+        let c = parse_caps(xml);
+        assert_eq!((c.glass, c.feeder_area), (Some((2480, 3508)), Some((2550, 4200))));
+    }
+
+    #[test]
+    fn the_resolution_range_is_read_from_its_own_element() {
+        let xml = "<a><Brightness><Min>0</Min><Max>10</Max></Brightness><XResolutionRange><Min>100</Min><Max>600</Max></XResolutionRange></a>";
+        assert_eq!(parse_caps(xml).resolutions, vec![100, 150, 200, 300, 400, 600]);
     }
 
     #[test]

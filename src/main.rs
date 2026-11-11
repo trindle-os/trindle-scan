@@ -3,9 +3,9 @@
 mod browse;
 mod escl;
 mod mdns;
-mod pages;
 mod naming;
 mod ocr;
+mod pages;
 mod pdf;
 mod profile;
 mod profiles;
@@ -13,42 +13,42 @@ mod sane;
 mod saving;
 mod scanning;
 mod settings;
-mod tidy;
-mod viewer;
-mod views;
-mod words;
 #[cfg(test)]
 mod shots;
 #[cfg(test)]
 mod testdir;
 #[cfg(test)]
 mod tests;
+mod tidy;
+mod viewer;
+mod views;
+mod words;
 
 use browse::{Browse, Purpose};
 use escl::{Caps, Fail, Scanner};
 use image::{DynamicImage, GenericImageView};
 use pages::{Cut, List, Loaded, Page};
 use profile::{Book, Colour, Format, Profile, Size, Source};
+use saving::*;
 use settings::{Settings, Units};
 use std::cell::Cell;
-use trindle_toolkit::t;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use trindle_toolkit::bus::{Bus, Listen};
 use trindle_toolkit::chooser::{self, Ask};
+use trindle_toolkit::crop::{self, Crop};
 use trindle_toolkit::dnd::Given;
 use trindle_toolkit::event::{Loop, Post};
-use trindle_toolkit::input::{Input, Keysym, Mods};
-use trindle_toolkit::crop::{self, Crop};
 use trindle_toolkit::input::Cursor;
+use trindle_toolkit::input::{Input, Keysym, Mods};
 use trindle_toolkit::picture;
-use trindle_toolkit::zoom::{self, View};
+use trindle_toolkit::t;
 use trindle_toolkit::ui::{App, Shown};
 use trindle_toolkit::widget::*;
 use trindle_toolkit::window::{Display, Kind};
-use saving::*;
+use trindle_toolkit::zoom::{self, View};
 
 enum Event {
     Found(Scanner),
@@ -60,7 +60,9 @@ enum Event {
     SaveTo(PathBuf),
     SaveIn(PathBuf),
     Failed(String),
-    Saved(Result<String, String>),
+    Saved(Result<SavedTo, String>),
+
+    Languages(Vec<String>),
     AutoSaved(Result<String, String>, Vec<u32>),
 
     Reading(usize, usize),
@@ -270,12 +272,16 @@ struct Scan {
     held_blank: Vec<Page>,
     last_saved_dir: Option<PathBuf>,
     force_glass: bool,
+
+    checking: bool,
     batch: BatchState,
     summary: String,
     busy: Option<u32>,
     announce: Option<String>,
     keep_dir: Option<PathBuf>,
     recoverable: usize,
+
+    unkept: usize,
     keep_lock: Option<std::fs::File>,
 
     remembered: Option<usize>,
@@ -312,6 +318,7 @@ const PAUSES: [u32; 6] = [0, 5, 10, 30, 60, 120];
 const RUNS: [u32; 6] = [2, 3, 4, 5, 10, 20];
 
 impl Scan {
+    #[rustfmt::skip]
     fn new(events: Loop, bus: Option<Bus>, post: Post<Event>) -> Scan {
         Scan {
             events, bus, post,
@@ -329,12 +336,12 @@ impl Scan {
             book: Book::first_run(), book_path: None,
             session: None, more: false, turn_over: None,
             no_paper: false, offline: false, blanks: 0, held_blank: Vec::new(),
-            last_saved_dir: None, force_glass: false,
+            last_saved_dir: None, force_glass: false, checking: false,
             batch: BatchState::default(),
             summary: String::new(),
             busy: None,
             announce: None,
-            keep_dir: None, recoverable: 0, keep_lock: None, remembered: None,
+            keep_dir: None, recoverable: 0, unkept: 0, keep_lock: None, remembered: None,
             view_img: None,
             zoom: View::new((1.0, 1.0), VIEW_AREA), zoom_drag: zoom::Drag::new(),
             crop_box: Crop::new(Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 }),
@@ -361,9 +368,10 @@ impl Scan {
 
     fn persist_settings(&mut self) {
         if let Some(p) = &self.settings_path
-            && let Err(e) = self.settings.save(p) {
-                self.problem = Some(t!("scan-main-error-keep-settings", why = &e.to_string()));
-            }
+            && let Err(e) = self.settings.save(p)
+        {
+            self.problem = Some(t!("scan-main-error-keep-settings", why = &e.to_string()));
+        }
     }
 
     fn with_book(mut self, path: Option<PathBuf>) -> Scan {
@@ -380,7 +388,7 @@ impl Scan {
             return self;
         }
 
-        let lock = std::fs::File::create(dir.with_extension("lock")).ok().filter(|f| f.try_lock().is_ok());
+        let lock = open_lock(&dir.with_extension("lock")).filter(|f| f.try_lock().is_ok());
         if lock.is_some() {
             self.recoverable = std::fs::read_dir(&dir).map(|r| r.flatten().filter(|e| e.path().extension().map(|x| x == "jpg").unwrap_or(false)).count()).unwrap_or(0);
             self.keep_dir = Some(dir);
@@ -397,13 +405,24 @@ impl Scan {
         }
     }
 
-    fn keep(&self, p: &Page) {
+    fn keep(&mut self, p: &Page) {
+        let Some(d) = &self.keep_dir else { return };
 
-        if let Some(d) = &self.keep_dir
-            && self.recoverable == 0
-        {
-            let _ = trindle_common::files::write_private(&d.join(format!("{:06}.jpg", p.id)), p.jpeg.as_slice());
+        let done = self.recoverable == 0 && trindle_common::files::write_private(&d.join(format!("{:06}.jpg", p.id)), p.jpeg.as_slice()).is_ok();
+        if !done {
+            self.unkept += 1;
         }
+    }
+
+    fn say_unkept(&mut self) {
+        if self.unkept > 0 {
+            let words = t!("scan-main-error-not-kept", n = self.unkept).to_string();
+            self.problem = Some(match self.problem.take() {
+                Some(p) => format!("{p} {words}"),
+                None => words,
+            });
+        }
+        self.unkept = 0;
     }
 
     fn clear_keep(&self) {
@@ -414,13 +433,73 @@ impl Scan {
 
     fn persist(&mut self) {
         if let Some(p) = &self.book_path
-            && let Err(e) = self.book.save(p) {
-                self.problem = Some(t!("scan-main-error-keep-profiles", why = &e.to_string()));
-            }
+            && let Err(e) = self.book.save(p)
+        {
+            self.problem = Some(t!("scan-main-error-keep-profiles", why = &e.to_string()));
+        }
     }
 
     fn scanner(&self) -> Option<&Scanner> {
         self.chosen.and_then(|i| self.scanners.get(i))
+    }
+
+    fn footer_lines(&self) -> Vec<Node<Msg>> {
+        let mut words = vec![note(self.status())];
+        if !self.note.is_empty() {
+            words.push(label(self.note.clone()));
+        }
+        if self.recoverable > 0 {
+            words.push(label(t!("scan-pages-recover-left", n = self.recoverable)));
+        }
+        let mut lines: Vec<Node<Msg>> = vec![row(words).gap(16.0)];
+        if self.recoverable > 0 {
+            lines.push(row(vec![word_button(t!("scan-pages-recover")).on_press(Msg::Recover), word_button(t!("scan-pages-discard")).on_press(Msg::ForgetRecovery)]).gap(16.0));
+        }
+        if self.screen == Screen::Main && !self.list.pages.is_empty() {
+            lines.push(
+                row(vec![
+                    label(t!("scan-pages-thumbnails")),
+                    slider(self.settings.thumb as f32, settings::THUMB_MIN as f32, settings::THUMB_MAX as f32, 10.0, t!("scan-settings-thumb-spoken"), |v| Msg::Set(Set::Thumb(v)))
+                        .width(Length::Fixed(180.0)),
+                ])
+                .gap(16.0),
+            );
+        }
+        lines.push(
+            row(vec![
+                word_button(t!("scan-pages-settings")).on_press(Msg::Settings),
+                word_button(t!("scan-pages-shortcuts")).on_press(Msg::Shortcuts),
+                word_button(t!("scan-pages-add-pictures")).on_press(Msg::OpenPictures),
+            ])
+            .gap(16.0),
+        );
+        let mut after: Vec<Node<Msg>> = Vec::new();
+        if self.last_saved_dir.is_some() {
+            after.push(word_button(t!("scan-pages-open-folder")).on_press(Msg::OpenFolder));
+        }
+        if self.list.pages.iter().any(|p| p.saved) {
+            after.push(word_button(t!("scan-pages-clear-saved")).on_press(Msg::ClearSaved));
+        }
+        if !after.is_empty() {
+            lines.push(row(after).gap(16.0));
+        }
+        lines
+    }
+
+    fn set_setting(&mut self, x: Set) {
+        match x {
+            Set::Pattern(t) => self.settings.pattern = t,
+            Set::Thumb(v) => self.settings.thumb = (v.round() as u32).clamp(settings::THUMB_MIN, settings::THUMB_MAX),
+            Set::Units(i) => self.settings.units = if i == 1 { Units::Inches } else { Units::Mm },
+            Set::RemoveSaved(b) => self.settings.remove_saved = b,
+            Set::Title(t) => self.settings.title = t,
+            Set::Author(t) => self.settings.author = t,
+            Set::Subject(t) => self.settings.subject = t,
+            Set::Keywords(t) => self.settings.keywords = t,
+            Set::Password(t) => self.settings.password = t,
+            Set::Split(i) => self.settings.split_every = settings::SPLITS.get(i).copied().unwrap_or(0),
+        }
+        self.persist_settings();
     }
 
     fn status(&self) -> String {
@@ -441,9 +520,18 @@ impl Scan {
 
     fn event(&mut self, e: Event) {
         match e {
-            m @ (Event::TestPage(..) | Event::TestDone(..) | Event::Found(..) | Event::SearchDone | Event::Caps(..) | Event::Failed(..) | Event::Damaged | Event::Page { .. } | Event::ScanDone(..) | Event::Checked(..)) => self.event_scan(m),
+            m @ (Event::TestPage(..)
+            | Event::TestDone(..)
+            | Event::Found(..)
+            | Event::SearchDone
+            | Event::Caps(..)
+            | Event::Failed(..)
+            | Event::Damaged
+            | Event::Page { .. }
+            | Event::ScanDone(..)
+            | Event::Checked(..)) => self.event_scan(m),
             m @ (Event::SaveTo(..) | Event::SaveIn(..) | Event::Reading(..) | Event::TextNote(..) | Event::SaveCancelled | Event::Saved(..) | Event::AutoSaved(..)) => self.event_saving(m),
-            m @ (Event::Opened(..) | Event::Loaded(..) | Event::NoOpen | Event::Recovered(..) | Event::SettingsFolder(..) | Event::Folder(..)) => self.event_files(m),
+            m @ (Event::Opened(..) | Event::Loaded(..) | Event::NoOpen | Event::Recovered(..) | Event::SettingsFolder(..) | Event::Folder(..) | Event::Languages(..)) => self.event_files(m),
         }
     }
 }
@@ -453,10 +541,46 @@ impl App for Scan {
 
     fn update(&mut self, msg: Msg) {
         match msg {
-            m @ (Msg::Scan | Msg::CancelScan | Msg::CancelReading | Msg::Finish | Msg::Scanners | Msg::SearchAgain | Msg::StopSearch | Msg::Pick(..) | Msg::Address(..) | Msg::AddAddress | Msg::SkipPause | Msg::StopBatch | Msg::Digit(..) | Msg::StopRetry | Msg::TestScan | Msg::UseGlass | Msg::TryAgain) => self.update_scan(m),
+            m @ (Msg::Scan
+            | Msg::CancelScan
+            | Msg::CancelReading
+            | Msg::Finish
+            | Msg::Scanners
+            | Msg::SearchAgain
+            | Msg::StopSearch
+            | Msg::Pick(..)
+            | Msg::Address(..)
+            | Msg::AddAddress
+            | Msg::SkipPause
+            | Msg::StopBatch
+            | Msg::Digit(..)
+            | Msg::StopRetry
+            | Msg::TestScan
+            | Msg::UseGlass
+            | Msg::TryAgain) => self.update_scan(m),
             m @ (Msg::Click(..) | Msg::Delete | Msg::Undo | Msg::Redo | Msg::ClearSaved | Msg::RotateLeft | Msg::RotateRight | Msg::Flip) => self.update_pages(m),
-            m @ (Msg::Look | Msg::Step(..) | Msg::ViewPointer(..) | Msg::ViewScroll(..) | Msg::Zoom(..) | Msg::CropRatio(..) | Msg::Crop(..) | Msg::ApplyCrop | Msg::NoCrop | Msg::Keys(..) | Msg::DropIn(..) | Msg::DropFailed(..)) => self.update_viewer(m),
-            m @ (Msg::Profiles | Msg::UseProfile(..) | Msg::NewProfile | Msg::Preset(..) | Msg::EditProfile(..) | Msg::DuplicateProfile(..) | Msg::DeleteProfile(..) | Msg::MoveProfile(..) | Msg::DefaultProfile(..) | Msg::Edit(..)) => self.update_profiles(m),
+            m @ (Msg::Look
+            | Msg::Step(..)
+            | Msg::ViewPointer(..)
+            | Msg::ViewScroll(..)
+            | Msg::Zoom(..)
+            | Msg::CropRatio(..)
+            | Msg::Crop(..)
+            | Msg::ApplyCrop
+            | Msg::NoCrop
+            | Msg::Keys(..)
+            | Msg::DropIn(..)
+            | Msg::DropFailed(..)) => self.update_viewer(m),
+            m @ (Msg::Profiles
+            | Msg::UseProfile(..)
+            | Msg::NewProfile
+            | Msg::Preset(..)
+            | Msg::EditProfile(..)
+            | Msg::DuplicateProfile(..)
+            | Msg::DeleteProfile(..)
+            | Msg::MoveProfile(..)
+            | Msg::DefaultProfile(..)
+            | Msg::Edit(..)) => self.update_profiles(m),
             m @ (Msg::Save | Msg::CloseSave | Msg::OpenFolder | Msg::OpenPictures | Msg::Recover | Msg::ForgetRecovery | Msg::ChooseFolder | Msg::AskSettingsFolder(..)) => self.update_saving(m),
             Msg::Back => {
                 self.opening = false;
@@ -466,21 +590,7 @@ impl App for Scan {
             Msg::Settings => self.screen = Screen::Settings,
             Msg::Shortcuts => self.screen = Screen::Shortcuts,
             Msg::Browse(m) => self.browse_update(m),
-            Msg::Set(x) => {
-                match x {
-                    Set::Pattern(t) => self.settings.pattern = t,
-                    Set::Thumb(v) => self.settings.thumb = (v.round() as u32).clamp(settings::THUMB_MIN, settings::THUMB_MAX),
-                    Set::Units(i) => self.settings.units = if i == 1 { Units::Inches } else { Units::Mm },
-                    Set::RemoveSaved(b) => self.settings.remove_saved = b,
-                    Set::Title(t) => self.settings.title = t,
-                    Set::Author(t) => self.settings.author = t,
-                    Set::Subject(t) => self.settings.subject = t,
-                    Set::Keywords(t) => self.settings.keywords = t,
-                    Set::Password(t) => self.settings.password = t,
-                    Set::Split(i) => self.settings.split_every = settings::SPLITS.get(i).copied().unwrap_or(0),
-                }
-                self.persist_settings();
-            }
+            Msg::Set(x) => self.set_setting(x),
         }
     }
 
@@ -492,42 +602,22 @@ impl App for Scan {
             }
             Input::Key { sym, mods, .. } if matches!(self.screen, Screen::Main | Screen::Viewer(_)) => {
                 self.mods.set(*mods);
-                if self.screen == Screen::Main && !mods.ctrl && !mods.alt
-                    && let Some(n) = (Keysym::_1.raw()..=Keysym::_9.raw()).contains(&sym.raw()).then(|| (sym.raw() - Keysym::_1.raw()) as usize + 1) {
-                        return Some(Msg::Digit(n));
-                    }
-                (matches!(*sym, Keysym::a | Keysym::z | Keysym::Z | Keysym::Delete | Keysym::Left | Keysym::Right) || (!mods.ctrl && !mods.alt && matches!(sym.raw(), 0x2b | 0x2d | 0x30 | 0x3d))).then_some(Msg::Keys(*mods, *sym))
+                if self.screen == Screen::Main
+                    && !mods.ctrl
+                    && !mods.alt
+                    && let Some(n) = (Keysym::_1.raw()..=Keysym::_9.raw()).contains(&sym.raw()).then(|| (sym.raw() - Keysym::_1.raw()) as usize + 1)
+                {
+                    return Some(Msg::Digit(n));
+                }
+                (matches!(*sym, Keysym::a | Keysym::z | Keysym::Z | Keysym::Delete | Keysym::Left | Keysym::Right) || (!mods.ctrl && !mods.alt && matches!(sym.raw(), 0x2b | 0x2d | 0x30 | 0x3d)))
+                    .then_some(Msg::Keys(*mods, *sym))
             }
             _ => None,
         }
     }
 
     fn view(&self) -> Node<Msg> {
-        let mut words = vec![note(self.status())];
-        if !self.note.is_empty() {
-            words.push(label(self.note.clone()));
-        }
-        if self.recoverable > 0 {
-            words.push(label(t!("scan-pages-recover-left", n = self.recoverable)));
-        }
-        let mut lines: Vec<Node<Msg>> = vec![row(words).gap(16.0)];
-        if self.recoverable > 0 {
-            lines.push(row(vec![word_button(t!("scan-pages-recover")).on_press(Msg::Recover), word_button(t!("scan-pages-discard")).on_press(Msg::ForgetRecovery)]).gap(16.0));
-        }
-        if self.screen == Screen::Main && !self.list.pages.is_empty() {
-            lines.push(row(vec![label(t!("scan-pages-thumbnails")), slider(self.settings.thumb as f32, settings::THUMB_MIN as f32, settings::THUMB_MAX as f32, 10.0, t!("scan-settings-thumb-spoken"), |v| Msg::Set(Set::Thumb(v))).width(Length::Fixed(180.0))]).gap(16.0));
-        }
-        lines.push(row(vec![word_button(t!("scan-pages-settings")).on_press(Msg::Settings), word_button(t!("scan-pages-shortcuts")).on_press(Msg::Shortcuts), word_button(t!("scan-pages-add-pictures")).on_press(Msg::OpenPictures)]).gap(16.0));
-        let mut after: Vec<Node<Msg>> = Vec::new();
-        if self.last_saved_dir.is_some() {
-            after.push(word_button(t!("scan-pages-open-folder")).on_press(Msg::OpenFolder));
-        }
-        if self.list.pages.iter().any(|p| p.saved) {
-            after.push(word_button(t!("scan-pages-clear-saved")).on_press(Msg::ClearSaved));
-        }
-        if !after.is_empty() {
-            lines.push(row(after).gap(16.0));
-        }
+        let lines = self.footer_lines();
         let body = match self.screen {
             Screen::Main => self.pages_view(),
             Screen::Scanners => self.scanners_view(),
@@ -540,22 +630,24 @@ impl App for Scan {
             Screen::Closing => self.closing_view(),
             Screen::Browse => self.browse_view(),
         };
-        column(vec![card(self.bar()), body, column(lines).gap(8.0).padding(10.0)])
-            .gap(8.0)
-            .padding(12.0)
-            .on_drop_from_outside(
-                |held| if held.offered.files { held.usual() } else { None },
-                |_, given, _| match given {
-                    Given::Files(f) => Msg::DropIn(f),
-                    Given::Nothing(why) => Msg::DropFailed(t!("scan-main-drop-nothing", why = why.words())),
-                    Given::Text(_) | Given::Typed(..) => Msg::DropFailed(t!("scan-main-drop-text").into()),
-                },
-            )
+        column(vec![card(self.bar()), body, column(lines).gap(8.0).padding(10.0)]).gap(8.0).padding(12.0).on_drop_from_outside(
+            |held| if held.offered.files { held.usual() } else { None },
+            |_, given, _| match given {
+                Given::Files(f) => Msg::DropIn(f),
+                Given::Nothing(why) => Msg::DropFailed(t!("scan-main-drop-nothing", why = why.words())),
+                Given::Text(_) | Given::Typed(..) => Msg::DropFailed(t!("scan-main-drop-text").into()),
+            },
+        )
     }
 
     fn window_title(&self) -> Option<String> {
         Some(t!("scan-app-name").into())
     }
+}
+
+pub struct SavedTo {
+    pub dir: PathBuf,
+    pub words: String,
 }
 
 fn worker(work: impl FnOnce() + Send + 'static, on_panic: impl FnOnce() + Send + 'static) {
@@ -566,21 +658,35 @@ fn worker(work: impl FnOnce() + Send + 'static, on_panic: impl FnOnce() + Send +
     });
 }
 
+fn speak_pending(s: &Shown<Scan>) {
+    if let Some(words) = s.with(|a| a.announce.clone()) {
+        s.change(|a| a.announce = None);
+        s.announce(&words);
+    }
+}
+
 fn crashed() -> String {
     t!("scan-main-error-crashed").into()
 }
 
 fn split_address(text: &str) -> (String, u16) {
     if let Some(rest) = text.strip_prefix('[')
-        && let Some((host, tail)) = rest.split_once(']') {
-            let port = tail.strip_prefix(':').and_then(|p| p.parse().ok()).unwrap_or(80);
-            return (format!("[{host}]"), port);
-        }
+        && let Some((host, tail)) = rest.split_once(']')
+    {
+        let port = tail.strip_prefix(':').and_then(|p| p.parse().ok()).unwrap_or(80);
+        return (format!("[{host}]"), port);
+    }
     if let Some((h, p)) = text.rsplit_once(':')
-        && let (false, Ok(port)) = (h.contains(':'), p.parse::<u16>()) {
-            return (h.to_string(), port);
-        }
+        && let (false, Ok(port)) = (h.contains(':'), p.parse::<u16>())
+    {
+        return (h.to_string(), port);
+    }
     if text.contains(':') { (format!("[{text}]"), 80) } else { (text.to_string(), 80) }
+}
+
+fn open_lock(path: &std::path::Path) -> Option<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new().write(true).create(true).truncate(false).mode(0o600).custom_flags(libc::O_NOFOLLOW).open(path).ok()
 }
 
 fn main() {
@@ -596,10 +702,7 @@ fn main() {
     let post = events.post(move |e: Event| {
         if let Some(s) = there.borrow().as_ref() {
             s.change(|a| a.event(e));
-            if let Some(words) = s.with(|a| a.announce.clone()) {
-                s.change(|a| a.announce = None);
-                s.announce(&words);
-            }
+            speak_pending(s);
         }
     });
     let app = Scan::new(events.clone(), Bus::session(&events).ok(), post).with_settings(Settings::path()).with_book(Book::path());
@@ -618,16 +721,16 @@ fn main() {
     let tick = shown.clone();
     events.every(std::time::Duration::from_secs(1), move || {
         tick.change_if(|a| a.tick());
-
-        if let Some(words) = tick.with(|a| a.announce.clone()) {
-            tick.change(|a| a.announce = None);
-            tick.announce(&words);
-        }
+        speak_pending(&tick);
         trindle_toolkit::event::Flow::Continue
     });
 
     shown.change(|a| a.start_search());
     events.run();
 
-    shown.with(|a| if a.recoverable == 0 { a.clear_keep() });
+    shown.with(|a| {
+        if a.recoverable == 0 {
+            a.clear_keep()
+        }
+    });
 }

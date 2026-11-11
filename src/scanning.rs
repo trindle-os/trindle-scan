@@ -3,7 +3,6 @@
 use super::*;
 
 impl Scan {
-
     pub(super) fn on_open(&mut self) {
         if self.chosen.is_none() {
             self.screen = Screen::Scanners;
@@ -20,18 +19,25 @@ impl Scan {
         self.stop_search = Arc::new(AtomicBool::new(false));
         let (post, stop) = (self.post.clone(), self.stop_search.clone());
         let post2 = post.clone();
-        worker(move || {
-            for f in sane::list() {
-                post.send(Event::Found(Scanner { name: f.name, host: format!("{}{}", sane::PREFIX, f.device), port: 0, root: String::new() }));
-            }
-            let p = post.clone();
-            let _ = mdns::search(12, || stop.load(Ordering::Relaxed), move |f| {
-                p.send(Event::Found(Scanner { name: f.name, host: f.host, port: f.port, root: f.root }));
-            });
-            post.send(Event::SearchDone);
-        }, move || {
-            post2.send(Event::SearchDone);
-        });
+        worker(
+            move || {
+                for f in sane::list() {
+                    post.send(Event::Found(Scanner { name: f.name, host: format!("{}{}", sane::PREFIX, f.device), port: 0, root: String::new() }));
+                }
+                let p = post.clone();
+                let _ = mdns::search(
+                    12,
+                    || stop.load(Ordering::Relaxed),
+                    move |f| {
+                        p.send(Event::Found(Scanner { name: f.name, host: f.host, port: f.port, root: f.root }));
+                    },
+                );
+                post.send(Event::SearchDone);
+            },
+            move || {
+                post2.send(Event::SearchDone);
+            },
+        );
     }
 
     pub(super) fn add_scanner(&mut self, s: Scanner) -> usize {
@@ -65,12 +71,15 @@ impl Scan {
             self.persist();
         }
         let (post, post2, s2) = (self.post.clone(), self.post.clone(), s.clone());
-        worker(move || {
-            let r = s.capabilities();
-            post.send(Event::Caps(s, r));
-        }, move || {
-            post2.send(Event::Caps(s2, Err(Fail::Other(crashed()))));
-        });
+        worker(
+            move || {
+                let r = s.capabilities();
+                post.send(Event::Caps(s, r));
+            },
+            move || {
+                post2.send(Event::Caps(s2, Err(Fail::Other(crashed()))));
+            },
+        );
     }
 
     pub(super) fn begin_scan(&mut self) {
@@ -111,13 +120,16 @@ impl Scan {
         self.stop_scan = Arc::new(AtomicBool::new(false));
         let (post, stop, post2) = (self.post.clone(), self.stop_scan.clone(), self.post.clone());
         let bw = prof.colour == Colour::BlackWhite;
-        worker(move || {
-            let p = post.clone();
-            let r = s.scan(&settings, || stop.load(Ordering::Relaxed), move |jpeg| take_scanned(&p, &prof, bw, settings.dpi, jpeg));
-            post.send(Event::ScanDone(r));
-        }, move || {
-            post2.send(Event::ScanDone(Err(Fail::Other(crashed()))));
-        });
+        worker(
+            move || {
+                let p = post.clone();
+                let r = s.scan(&settings, || stop.load(Ordering::Relaxed), move |jpeg| take_scanned(&p, &prof, bw, settings.dpi, jpeg));
+                post.send(Event::ScanDone(r));
+            },
+            move || {
+                post2.send(Event::ScanDone(Err(Fail::Other(crashed()))));
+            },
+        );
     }
 
     pub(super) fn begin_test(&mut self) {
@@ -133,28 +145,35 @@ impl Scan {
         self.testing = true;
         self.test_img = None;
         let (post, post2) = (self.post.clone(), self.post.clone());
-        worker(move || {
-            let stop = Arc::new(AtomicBool::new(false));
-            let (p, flag, stop2) = (post.clone(), Arc::new(AtomicBool::new(false)), stop.clone());
-            let r = s.scan(&settings, || stop.load(Ordering::Relaxed), move |jpeg| {
-                if flag.swap(true, Ordering::Relaxed) {
-                    return;
-                }
-                stop2.store(true, Ordering::Relaxed);
-                match image::load_from_memory(&jpeg) {
-                    Ok(img) => {
-                        let img = tidy::tidy(&prof, img.clone()).unwrap_or(img);
-                        p.send(Event::TestPage(img));
-                    }
-                    Err(_) => {
-                        p.send(Event::Damaged);
-                    }
-                }
-            });
-            post.send(Event::TestDone(r));
-        }, move || {
-            post2.send(Event::TestDone(Err(Fail::Other(crashed()))));
-        });
+        worker(
+            move || {
+                let stop = Arc::new(AtomicBool::new(false));
+                let (p, flag, stop2) = (post.clone(), Arc::new(AtomicBool::new(false)), stop.clone());
+                let r = s.scan(
+                    &settings,
+                    || stop.load(Ordering::Relaxed),
+                    move |jpeg| {
+                        if flag.swap(true, Ordering::Relaxed) {
+                            return;
+                        }
+                        stop2.store(true, Ordering::Relaxed);
+                        match image::load_from_memory(&jpeg) {
+                            Ok(img) => {
+                                let img = tidy::tidy(&prof, img.clone()).unwrap_or(img);
+                                p.send(Event::TestPage(img));
+                            }
+                            Err(_) => {
+                                p.send(Event::Damaged);
+                            }
+                        }
+                    },
+                );
+                post.send(Event::TestDone(r));
+            },
+            move || {
+                post2.send(Event::TestDone(Err(Fail::Other(crashed()))));
+            },
+        );
     }
 
     pub(super) fn after_run(&mut self) {
@@ -241,6 +260,7 @@ impl Scan {
 
     pub(super) fn finish_session(&mut self, report: bool) {
         self.more = false;
+        self.force_glass = false;
         self.turn_over = None;
         let Some(ids) = self.session.take() else { return };
         let n = ids.len();
@@ -255,15 +275,18 @@ impl Scan {
             let (opt, every) = (self.settings.pdf_options(), self.settings.split_every);
             self.stop_reading = Arc::new(AtomicBool::new(false));
             let stop = self.stop_reading.clone();
-            worker(move || {
-                let r = auto_save(&prof, &cuts, &opt, every, &post, &stop);
-                match r {
-                    Some(r) => post.send(Event::AutoSaved(r, ids)),
-                    None => return,
-                };
-            }, move || {
-                post2.send(Event::AutoSaved(Err(crashed()), ids2));
-            });
+            worker(
+                move || {
+                    let r = auto_save(&prof, &cuts, &opt, every, &post, &stop);
+                    match r {
+                        Some(r) => post.send(Event::AutoSaved(r, ids)),
+                        None => return,
+                    };
+                },
+                move || {
+                    post2.send(Event::AutoSaved(Err(crashed()), ids2));
+                },
+            );
         }
     }
 
@@ -275,23 +298,30 @@ impl Scan {
         let s = Scanner { name: host.clone(), host, port, root: "eSCL".into() };
         let (post, post2) = (self.post.clone(), self.post.clone());
         self.problem = Some(t!("scan-main-note-checking-address").into());
+        self.checking = true;
         self.address.clear();
-        worker(move || {
-            let r = s.capabilities();
-            post.send(Event::Checked(r.as_ref().err().map(|f| f.words())));
-            if r.is_ok() {
-                post.send(Event::Found(s.clone()));
-            }
-            post.send(Event::Caps(s, r));
-        }, move || {
-            post2.send(Event::Checked(Some(crashed())));
-        });
+        worker(
+            move || {
+                let r = s.capabilities();
+                post.send(Event::Checked(r.as_ref().err().map(|f| f.words())));
+                if r.is_ok() {
+                    post.send(Event::Found(s.clone()));
+                }
+                post.send(Event::Caps(s, r));
+            },
+            move || {
+                post2.send(Event::Checked(Some(crashed())));
+            },
+        );
     }
 
     pub(super) fn update_scan(&mut self, msg: Msg) {
         match msg {
             Msg::Scan => {
                 self.screen = Screen::Main;
+                if !self.more {
+                    self.force_glass = false;
+                }
                 self.begin_scan()
             }
             Msg::CancelScan => self.stop_scan.store(true, Ordering::Relaxed),
@@ -337,7 +367,6 @@ impl Scan {
                 self.problem = None;
                 self.no_paper = false;
                 self.begin_scan();
-                self.force_glass = false;
             }
             Msg::TryAgain => self.begin_scan(),
             _ => {}
@@ -379,7 +408,6 @@ impl Scan {
     pub(super) fn scan_done(&mut self, r: Result<usize, Fail>) {
         self.scanning = false;
         if self.session.as_ref().map(|s| s.is_empty()).unwrap_or(true) && !self.held_blank.is_empty() {
-
             let mut keep = self.held_blank.remove(0);
             keep.selected = true;
             self.keep(&keep);
@@ -399,6 +427,7 @@ impl Scan {
                 self.announce = Some(self.note.clone());
             }
             Err(f) => {
+                self.force_glass = false;
                 self.no_paper = f == Fail::NoPaper;
                 self.offline = matches!(f, Fail::Offline(_));
                 if f != Fail::Busy {
@@ -417,6 +446,7 @@ impl Scan {
                 }
             }
         }
+        self.say_unkept();
     }
 
     pub(super) fn event_scan(&mut self, e: Event) {
@@ -456,7 +486,8 @@ impl Scan {
                 self.page_arrived(pg, blank);
             }
             Event::ScanDone(r) => self.scan_done(r),
-            Event::Checked(w) if w.is_some() || self.problem.as_deref() == Some(t!("scan-main-note-checking-address")) => {
+            Event::Checked(w) if w.is_some() || self.checking => {
+                self.checking = false;
                 self.problem = w;
             }
             _ => {}

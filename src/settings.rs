@@ -1,8 +1,8 @@
 //! Settings of the program itself, kept in ~/.config/trindle-scan/settings.conf and saved as they are changed.
 
 use crate::profile::Size;
-use trindle_toolkit::t;
 use std::path::{Path, PathBuf};
+use trindle_toolkit::t;
 
 pub fn private_folder(dir: &Path) -> bool {
     use std::os::unix::fs::{DirBuilderExt, MetadataExt};
@@ -10,7 +10,6 @@ pub fn private_folder(dir: &Path) -> bool {
     b.recursive(true).mode(0o700);
     let _ = b.create(dir);
     match std::fs::symlink_metadata(dir) {
-
         Ok(m) => m.is_dir() && m.uid() == unsafe { libc::geteuid() } && m.mode() & 0o077 == 0,
         Err(_) => false,
     }
@@ -24,7 +23,6 @@ pub enum Units {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
-
     pub folder: String,
 
     pub pattern: String,
@@ -57,7 +55,20 @@ pub fn default_pattern() -> String {
 
 impl Default for Settings {
     fn default() -> Settings {
-        Settings { folder: String::new(), pattern: default_pattern(), thumb: 150, units: Units::Mm, temp_folder: String::new(), remove_saved: false, title: String::new(), author: String::new(), subject: String::new(), keywords: String::new(), password: String::new(), split_every: 0 }
+        Settings {
+            folder: String::new(),
+            pattern: default_pattern(),
+            thumb: 150,
+            units: Units::Mm,
+            temp_folder: String::new(),
+            remove_saved: false,
+            title: String::new(),
+            author: String::new(),
+            subject: String::new(),
+            keywords: String::new(),
+            password: String::new(),
+            split_every: 0,
+        }
     }
 }
 
@@ -133,7 +144,9 @@ impl Settings {
     pub fn size_words(&self, size: Size) -> String {
         let Some((w, h)) = size.area() else { return size.words().to_string() };
         match self.units {
-            Units::Mm => t!("scan-settings-size-mm", name = size.words(), w = &format!("{}", (w as f32 * 25.4 / BASE_DPI as f32).round()), h = &format!("{}", (h as f32 * 25.4 / BASE_DPI as f32).round())),
+            Units::Mm => {
+                t!("scan-settings-size-mm", name = size.words(), w = &format!("{}", (w as f32 * 25.4 / BASE_DPI as f32).round()), h = &format!("{}", (h as f32 * 25.4 / BASE_DPI as f32).round()))
+            }
             Units::Inches => t!("scan-settings-size-in", name = size.words(), w = &format!("{:.1}", w as f32 / BASE_DPI as f32), h = &format!("{:.1}", h as f32 / BASE_DPI as f32)),
         }
     }
@@ -152,7 +165,20 @@ mod tests {
         crate::words::ready();
         let dir = crate::testdir::tmp("settings");
         let path = dir.join("settings.conf");
-        let s = Settings { folder: "/home/john/Scans".into(), pattern: "Doc {counter:3}".into(), thumb: 220, units: Units::Inches, temp_folder: "/var/tmp".into(), remove_saved: true, title: "Bills".into(), author: "John Smith".into(), subject: "2026".into(), keywords: "a, b".into(), password: "open sesame".into(), split_every: 10 };
+        let s = Settings {
+            folder: "/home/john/Scans".into(),
+            pattern: "Doc {counter:3}".into(),
+            thumb: 220,
+            units: Units::Inches,
+            temp_folder: "/var/tmp".into(),
+            remove_saved: true,
+            title: "Bills".into(),
+            author: "John Smith".into(),
+            subject: "2026".into(),
+            keywords: "a, b".into(),
+            password: "open sesame".into(),
+            split_every: 10,
+        };
         s.save(&path).unwrap();
         assert_eq!(Settings::load(&path), s);
         std::fs::write(&path, "thumb=9999\nunits=junk\n").unwrap();

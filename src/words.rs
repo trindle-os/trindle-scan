@@ -24,8 +24,8 @@ pub static PATH_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
-    use trindle_toolkit::lang::check::{check, Domain};
-    use trindle_toolkit::lang::{with_catalogue, Bundle, Catalogue};
+    use trindle_toolkit::lang::check::{Domain, check};
+    use trindle_toolkit::lang::{Bundle, Catalogue, with_catalogue};
     use trindle_toolkit::t;
 
     fn root() -> PathBuf {
@@ -61,8 +61,28 @@ mod tests {
     }
 
     const SHOWING: [&str; 22] = [
-        "button(", "label(", "note(", ".spoken(", "heading(", "title(", "form_label(", "section(", "word_button(", "main_word(", "lead(",
-        "entry(", "switch(", "slider(", "drawing(", "choice(", "one_of(", "item(", ".detail(", "remove(", ".announce(", "Ask {",
+        "button(",
+        "label(",
+        "note(",
+        ".spoken(",
+        "heading(",
+        "title(",
+        "form_label(",
+        "section(",
+        "word_button(",
+        "main_word(",
+        "lead(",
+        "entry(",
+        "switch(",
+        "slider(",
+        "drawing(",
+        "choice(",
+        "one_of(",
+        "item(",
+        ".detail(",
+        "remove(",
+        ".announce(",
+        "Ask {",
     ];
 
     const NOT_WORDS: [&str; 2] = ["{year} {month} {day} {hour} {minute} {second} {counter:3} {profile}", "{year} {month} {day} {hour} {minute} {second} {profile}"];

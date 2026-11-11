@@ -128,11 +128,12 @@ type Instance = (Option<(u16, String)>, Vec<(String, String)>);
 pub struct Heard {
     instances: BTreeMap<String, Instance>,
     addresses: BTreeMap<String, Ipv4Addr>,
+
+    names: BTreeMap<String, String>,
     pub shown: Vec<String>,
 }
 
 impl Heard {
-
     pub fn take(&mut self, packet: &[u8], from: Ipv4Addr) -> Vec<Found> {
         if !crate::escl::is_private(IpAddr::V4(from)) {
             return Vec::new();
@@ -143,6 +144,7 @@ impl Heard {
             }
             match r.data {
                 Data::Ptr(inst) if r.name == SERVICE && inst.len() <= LONGEST_NAME && (self.instances.len() < MOST_HEARD || self.instances.contains_key(&inst.to_ascii_lowercase())) => {
+                    self.names.entry(inst.to_ascii_lowercase()).or_insert_with(|| inst.clone());
                     self.instances.entry(inst.to_ascii_lowercase()).or_default();
                 }
                 Data::Srv(port, target) if self.instances.contains_key(&r.name) || self.instances.len() < MOST_HEARD => {
@@ -163,10 +165,16 @@ impl Heard {
                 continue;
             }
             let get = |k: &str| txt.iter().find(|(a, _)| a == k).map(|(_, v)| v.clone());
-            let friendly = inst.strip_suffix(&format!(".{SERVICE}")).unwrap_or(inst);
+            let suffix = format!(".{SERVICE}");
+            let friendly = match self.names.get(inst) {
+                Some(n) if n.len() >= suffix.len() && n.is_char_boundary(n.len() - suffix.len()) && n[n.len() - suffix.len()..].eq_ignore_ascii_case(&suffix) => {
+                    n[..n.len() - suffix.len()].to_string()
+                }
+                _ => inst.strip_suffix(&suffix).unwrap_or(inst).to_string(),
+            };
             let mut root = get("rs").unwrap_or_else(|| "eSCL".into());
             root = root.trim_matches('/').to_string();
-            fresh.push(Found { name: friendly.to_string(), host: addr.to_string(), port: *port, root });
+            fresh.push(Found { name: friendly, host: addr.to_string(), port: *port, root });
             self.shown.push(inst.clone());
         }
         fresh
@@ -238,7 +246,7 @@ mod tests {
         let mut h = Heard::default();
         let office = Ipv4Addr::new(192, 168, 1, 40);
         let got = h.take(&p, office);
-        assert_eq!(got, vec![Found { name: "office printer".into(), host: "192.168.1.40".into(), port: 8080, root: "eSCL".into() }]);
+        assert_eq!(got, vec![Found { name: "Office printer".into(), host: "192.168.1.40".into(), port: 8080, root: "eSCL".into() }]);
         assert!(h.take(&p, office).is_empty(), "the same scanner is shown once");
         let mut other = Heard::default();
         assert!(other.take(&p, Ipv4Addr::new(192, 168, 1, 99)).is_empty(), "an address record from someone else is not believed");

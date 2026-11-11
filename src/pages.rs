@@ -97,15 +97,22 @@ pub struct Cut {
     pub dpi: u32,
 }
 
-impl Cut {
+pub type FinalPage = (Arc<Vec<u8>>, u32, u32, Option<DynamicImage>);
 
+impl Cut {
     pub fn final_jpeg(&self) -> Result<(Arc<Vec<u8>>, u32, u32), String> {
-        if !(self.rot != 0 || self.flip_h || self.flip_v || self.crop.is_some()) {
-            return Ok((self.jpeg.clone(), self.width, self.height));
+        self.final_with_picture(false).map(|(j, w, h, _)| (j, w, h))
+    }
+
+    pub fn final_with_picture(&self, want_picture: bool) -> Result<FinalPage, String> {
+        let unedited = !(self.rot != 0 || self.flip_h || self.flip_v || self.crop.is_some());
+        if unedited && !want_picture {
+            return Ok((self.jpeg.clone(), self.width, self.height, None));
         }
         let img = self.edited()?;
         let (w, h) = image::GenericImageView::dimensions(&img);
-        Ok((Arc::new(crate::tidy::jpeg(&img)?), w, h))
+        let jpeg = if unedited { self.jpeg.clone() } else { Arc::new(crate::tidy::jpeg(&img)?) };
+        Ok((jpeg, w, h, want_picture.then_some(img)))
     }
 
     pub fn edited(&self) -> Result<DynamicImage, String> {
@@ -259,7 +266,23 @@ mod tests {
         let mut l = List::default();
         for _ in 0..n {
             let id = l.new_id();
-            l.pages.push(Page { id, rot: 0, flip_h: false, flip_v: false, crop: None, thumb0: Rc::new(DynamicImage::new_rgb8(1, 1)), jpeg: Arc::new(vec![]), thumb: Rc::new(DynamicImage::new_rgb8(1, 1)), width: 1, height: 1, grey: false, bw: false, dpi: BASE_DPI, selected: false, saved: false });
+            l.pages.push(Page {
+                id,
+                rot: 0,
+                flip_h: false,
+                flip_v: false,
+                crop: None,
+                thumb0: Rc::new(DynamicImage::new_rgb8(1, 1)),
+                jpeg: Arc::new(vec![]),
+                thumb: Rc::new(DynamicImage::new_rgb8(1, 1)),
+                width: 1,
+                height: 1,
+                grey: false,
+                bw: false,
+                dpi: BASE_DPI,
+                selected: false,
+                saved: false,
+            });
         }
         l
     }

@@ -37,7 +37,12 @@ impl Scan {
         let post = self.post.clone();
         let bus = &bus;
         self.asking = if format == Format::Pdf {
-            let ask = Ask { title: t!("scan-browse-title-save-pdf").into(), folder: self.save_start(), name: Some(format!("{}.pdf", t!("scan-browse-default-name"))), filters: vec![(t!("scan-profile-format-pdf").into(), vec!["*.pdf".into()])] };
+            let ask = Ask {
+                title: t!("scan-browse-title-save-pdf").into(),
+                folder: self.save_start(),
+                name: Some(format!("{}.pdf", t!("scan-browse-default-name"))),
+                filters: vec![(t!("scan-profile-format-pdf").into(), vec!["*.pdf".into()])],
+            };
             chooser::save(bus, &self.events, ask, move |p| {
                 if let Some(p) = p {
                     post.send(Event::SaveTo(p));
@@ -122,7 +127,12 @@ impl Scan {
             return;
         };
         let post = self.post.clone();
-        let ask = Ask { title: t!("scan-browse-title-pictures").into(), folder: self.save_start(), name: None, filters: vec![(t!("scan-main-filter-pictures").into(), vec!["*.jpg".into(), "*.jpeg".into(), "*.png".into(), "*.tif".into(), "*.tiff".into()])] };
+        let ask = Ask {
+            title: t!("scan-browse-title-pictures").into(),
+            folder: self.save_start(),
+            name: None,
+            filters: vec![(t!("scan-main-filter-pictures").into(), vec!["*.jpg".into(), "*.jpeg".into(), "*.png".into(), "*.tif".into(), "*.tiff".into()])],
+        };
         self.asking = chooser::open_many(bus, &self.events, ask, move |p| {
             if !p.is_empty() {
                 post.send(Event::Opened(p));
@@ -133,22 +143,26 @@ impl Scan {
     fn recover(&mut self) {
         let Some(d) = self.keep_dir.clone() else { return };
         let (post, post2) = (self.post.clone(), self.post.clone());
-        worker(move || {
-            let mut files: Vec<PathBuf> = std::fs::read_dir(&d).map(|r| r.flatten().map(|e| e.path()).filter(|p| p.extension().map(|x| x == "jpg").unwrap_or(false)).collect()).unwrap_or_default();
-            files.sort();
-            let mut items = Vec::new();
-            let mut old = Vec::new();
-            for f in files {
-                if let Ok(bytes) = std::fs::read(&f)
-                    && let Ok(img) = image::load_from_memory(&bytes) {
+        worker(
+            move || {
+                let mut files: Vec<PathBuf> = std::fs::read_dir(&d).map(|r| r.flatten().map(|e| e.path()).filter(|p| p.extension().map(|x| x == "jpg").unwrap_or(false)).collect()).unwrap_or_default();
+                files.sort();
+                let mut items = Vec::new();
+                let mut old = Vec::new();
+                for f in files {
+                    if let Ok(bytes) = std::fs::read(&f)
+                        && let Ok(img) = image::load_from_memory(&bytes)
+                    {
                         items.push(pages::loaded(bytes, &img));
                     }
-                old.push(f);
-            }
-            post.send(Event::Recovered(items, old));
-        }, move || {
-            post2.send(Event::Recovered(Vec::new(), Vec::new()));
-        });
+                    old.push(f);
+                }
+                post.send(Event::Recovered(items, old));
+            },
+            move || {
+                post2.send(Event::Recovered(Vec::new(), Vec::new()));
+            },
+        );
     }
 
     fn open_folder(&mut self) {
@@ -202,25 +216,29 @@ impl Scan {
         let (searchable, language) = self.book.now().map(|p| (p.searchable, p.ocr_lang.clone())).unwrap_or_default();
         self.stop_reading = Arc::new(AtomicBool::new(false));
         let stop = self.stop_reading.clone();
-        worker(move || {
-            let mut pages = match pdf_parts(&cuts) {
-                Ok(p) => p,
-                Err(e) => {
-                    post.send(Event::Saved(Err(e)));
+        worker(
+            move || {
+                let mut pages = match pdf_parts(&cuts) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        post.send(Event::Saved(Err(e)));
+                        return;
+                    }
+                };
+                if searchable && !give_text(&mut pages, &language, &post, &stop) {
                     return;
                 }
-            };
-            if searchable && !give_text(&mut pages, &language, &post, &stop) {
-                return;
-            }
-            let r = write_pdfs(&pages, &opt, every, &path, false).map(|files| match files.as_slice() {
-                [one] => one.display().to_string(),
-                _ => t!("scan-main-save-files", path = &path.display().to_string(), n = files.len()),
-            });
-            post.send(Event::Saved(r.map_err(|e| e.to_string())));
-        }, move || {
-            post2.send(Event::Saved(Err(crashed())));
-        });
+                let dir = path.parent().map(|d| d.to_path_buf()).unwrap_or_default();
+                let r = write_pdfs(&pages, &opt, every, &path, false).map(|files| match files.as_slice() {
+                    [one] => SavedTo { dir, words: one.display().to_string() },
+                    _ => SavedTo { dir, words: t!("scan-main-save-files", path = &path.display().to_string(), n = files.len()) },
+                });
+                post.send(Event::Saved(r.map_err(|e| e.to_string())));
+            },
+            move || {
+                post2.send(Event::Saved(Err(crashed())));
+            },
+        );
     }
 
     fn save_in(&mut self, dir: PathBuf) {
@@ -230,22 +248,26 @@ impl Scan {
         self.mark_saved();
         self.saving = true;
         let (post, post2) = (self.post.clone(), self.post.clone());
-        worker(move || {
-            let r = picture_parts(&cuts).and_then(|pics| naming::write_pictures(&pics, fmt, &dir, t!("scan-browse-default-name")).map(|_| dir.display().to_string()).map_err(|e| e.to_string()));
-            post.send(Event::Saved(r));
-        }, move || {
-            post2.send(Event::Saved(Err(crashed())));
-        });
+        worker(
+            move || {
+                let r = picture_parts(&cuts).and_then(|pics| {
+                    naming::write_pictures(&pics, fmt, &dir, t!("scan-browse-default-name")).map(|_| SavedTo { words: dir.display().to_string(), dir: dir.clone() }).map_err(|e| e.to_string())
+                });
+                post.send(Event::Saved(r));
+            },
+            move || {
+                post2.send(Event::Saved(Err(crashed())));
+            },
+        );
     }
 
-    fn saved(&mut self, r: Result<String, String>) {
+    fn saved(&mut self, r: Result<SavedTo, String>) {
         self.saving = false;
         self.reading = None;
         match r {
-            Ok(p) => {
-                let saved = std::path::Path::new(&p);
-                self.last_saved_dir = if saved.is_dir() { Some(saved.to_path_buf()) } else { saved.parent().map(|d| d.to_path_buf()) };
-                self.note = t!("scan-main-note-saved", path = &p);
+            Ok(to) => {
+                self.last_saved_dir = Some(to.dir);
+                self.note = t!("scan-main-note-saved", path = &to.words);
                 self.add_text_note();
                 if self.settings.remove_saved {
                     self.list.mark();
@@ -318,16 +340,37 @@ impl Scan {
             .collect()
     }
 
+    fn recovered(&mut self, items: Vec<Loaded>, old: Vec<PathBuf>) {
+        self.list.mark();
+        self.recoverable = 0;
+        let now: Vec<String> = self.add_pages(items).into_iter().map(|id| format!("{id:06}.jpg")).collect();
+        let recovered = now.len();
+
+        let kept = self.keep_dir.as_ref().is_some_and(|d| now.iter().all(|n| d.join(n).is_file()));
+        if kept {
+            for f in old {
+                if !f.file_name().is_some_and(|n| now.iter().any(|x| n == x.as_str())) {
+                    let _ = std::fs::remove_file(f);
+                }
+            }
+        }
+        self.say_unkept();
+        self.note = t!("scan-main-note-recovered", n = recovered);
+    }
+
     pub(super) fn event_files(&mut self, e: Event) {
         match e {
             Event::Opened(paths) => {
                 let (post, post2) = (self.post.clone(), self.post.clone());
-                worker(move || {
-                    let (items, failed) = load_pictures(paths);
-                    post.send(Event::Loaded(items, failed));
-                }, move || {
-                    post2.send(Event::Loaded(Vec::new(), 1));
-                });
+                worker(
+                    move || {
+                        let (items, failed) = load_pictures(paths);
+                        post.send(Event::Loaded(items, failed));
+                    },
+                    move || {
+                        post2.send(Event::Loaded(Vec::new(), 1));
+                    },
+                );
             }
             Event::Loaded(items, failed) => {
                 let added = items.len();
@@ -336,21 +379,12 @@ impl Scan {
                 }
                 self.add_pages(items);
                 self.note = if failed > 0 { t!("scan-main-note-added-failed", n = added, failed = failed) } else { t!("scan-main-note-added", n = added) };
+                self.say_unkept();
+                self.announce = Some(self.note.clone());
             }
+            Event::Languages(l) => self.ocr_langs = l,
             Event::NoOpen => self.problem = Some(t!("scan-main-error-open-folder").into()),
-            Event::Recovered(items, old) => {
-                self.list.mark();
-                self.recoverable = 0;
-                let now: Vec<String> = self.add_pages(items).into_iter().map(|id| format!("{id:06}.jpg")).collect();
-                let recovered = now.len();
-
-                for f in old {
-                    if !f.file_name().is_some_and(|n| now.iter().any(|x| n == x.as_str())) {
-                        let _ = std::fs::remove_file(f);
-                    }
-                }
-                self.note = t!("scan-main-note-recovered", n = recovered);
-            }
+            Event::Recovered(items, old) => self.recovered(items, old),
             Event::SettingsFolder(dir, temp) => {
                 let d = dir.display().to_string();
                 if temp {
@@ -377,7 +411,15 @@ pub(super) fn give_text(pages: &mut [pdf::PdfPage], language: &str, post: &Post<
         post.send(Event::TextNote(t!("scan-ocr-missing").to_string()));
         return true;
     };
-    match ocr::read_pages(&engine, pages, language, |i, n| { post.send(Event::Reading(i, n)); }, &|| stop.load(Ordering::Relaxed)) {
+    match ocr::read_pages(
+        &engine,
+        pages,
+        language,
+        |i, n| {
+            post.send(Event::Reading(i, n));
+        },
+        &|| stop.load(Ordering::Relaxed),
+    ) {
         Ok(failed) if failed.is_empty() => true,
         Ok(failed) => {
             let list = failed.iter().map(|n| n.to_string()).collect::<Vec<_>>().join(", ");
@@ -392,6 +434,16 @@ pub(super) fn give_text(pages: &mut [pdf::PdfPage], language: &str, post: &Post<
 }
 
 pub(super) fn write_pdfs(pages: &[pdf::PdfPage], opt: &pdf::Options, every: usize, path: &std::path::Path, exclusive: bool) -> std::io::Result<Vec<PathBuf>> {
+    write_pdfs_using(pages, |c, w| pdf::write(c, opt, w), every, path, exclusive)
+}
+
+pub(super) fn write_pdfs_using(
+    pages: &[pdf::PdfPage],
+    write: impl Fn(&[pdf::PdfPage], std::io::BufWriter<&std::fs::File>) -> std::io::Result<()>,
+    every: usize,
+    path: &std::path::Path,
+    exclusive: bool,
+) -> std::io::Result<Vec<PathBuf>> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -400,25 +452,58 @@ pub(super) fn write_pdfs(pages: &[pdf::PdfPage], opt: &pdf::Options, every: usiz
     let chunks: Vec<&[pdf::PdfPage]> = if every == 0 || pages.len() <= every { vec![pages] } else { pages.chunks(every).collect() };
     let many = chunks.len() > 1;
     let mut files = Vec::new();
-    for (i, c) in chunks.iter().enumerate() {
-        let (target, f) = if many {
-            naming::claim_name(&dir, &t!("scan-main-part-name", stem = &stem, n = i + 1), "pdf")?
-        } else if exclusive {
-            naming::claim_name(&dir, &stem, "pdf")?
-        } else {
-            (path.to_path_buf(), std::fs::File::create(path)?)
-        };
-        pdf::write(c, opt, std::io::BufWriter::new(f))?;
-        files.push(target);
+    let done = write_chunks(&chunks, write, path, (&dir, &stem), exclusive, &mut files);
+    if done.is_err() && (many || exclusive) {
+        for f in &files {
+            let _ = std::fs::remove_file(f);
+        }
     }
-    Ok(files)
+    done.map(|_| files)
+}
+
+fn write_chunks(
+    chunks: &[&[pdf::PdfPage]],
+    write: impl Fn(&[pdf::PdfPage], std::io::BufWriter<&std::fs::File>) -> std::io::Result<()>,
+    path: &std::path::Path,
+    (dir, stem): (&std::path::Path, &str),
+    exclusive: bool,
+    files: &mut Vec<PathBuf>,
+) -> std::io::Result<()> {
+    let many = chunks.len() > 1;
+    for (i, c) in chunks.iter().enumerate() {
+        if !many && !exclusive {
+            replace_file(path, |f| write(c, std::io::BufWriter::new(f)))?;
+            files.push(path.to_path_buf());
+            continue;
+        }
+        let (target, f) = if many { naming::claim_name(dir, &t!("scan-main-part-name", stem = stem, n = i + 1), "pdf")? } else { naming::claim_name(dir, stem, "pdf")? };
+        files.push(target);
+        write(c, std::io::BufWriter::new(&f))?;
+        f.sync_all()?;
+    }
+    Ok(())
+}
+
+pub(super) fn replace_file(path: &std::path::Path, fill: impl FnOnce(&std::fs::File) -> std::io::Result<()>) -> std::io::Result<()> {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let temp = path.with_file_name(format!(".{name}.part"));
+    let _ = std::fs::remove_file(&temp);
+    let f = std::fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+    let r = fill(&f).and_then(|_| f.sync_all()).and_then(|_| std::fs::rename(&temp, path));
+    if r.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    r
 }
 
 pub(super) fn pdf_parts(cuts: &[Cut]) -> Result<Vec<pdf::PdfPage>, String> {
     cuts.iter()
         .map(|c| {
-            let (jpeg, width, height) = c.final_jpeg()?;
-            let mono = if c.bw { Some(pdf::mono_of(&c.edited()?).map_err(|e| e.to_string())?) } else { None };
+            let (jpeg, width, height, picture) = c.final_with_picture(c.bw)?;
+            let mono = match picture {
+                Some(img) => Some(pdf::mono_of(&img).map_err(|e| e.to_string())?),
+                None => None,
+            };
             let f = 72.0 / c.dpi.max(1) as f32;
             Ok(pdf::PdfPage { words: Vec::new(), jpeg, mono, width, height, grey: c.grey, page: (width as f32 * f, height as f32 * f) })
         })

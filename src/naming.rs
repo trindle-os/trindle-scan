@@ -14,7 +14,6 @@ pub struct Clock {
 }
 
 pub fn now() -> Clock {
-
     unsafe {
         let t = libc::time(std::ptr::null_mut());
         let mut tm: libc::tm = std::mem::zeroed();
@@ -93,10 +92,53 @@ pub fn next_counter(dir: &Path, prefix: &str) -> u32 {
 
 pub fn write_pictures(pages: &[(Vec<u8>, bool)], format: Format, dir: &Path, stem: &str) -> std::io::Result<Vec<PathBuf>> {
     std::fs::create_dir_all(dir)?;
-    let mut out = Vec::new();
+    let mut made = Vec::new();
+    match write_all(pages, format, dir, stem, &mut made) {
+        Ok(()) => Ok(made),
+        Err(e) => {
+            for p in &made {
+                let _ = std::fs::remove_file(p);
+            }
+            Err(e)
+        }
+    }
+}
+
+fn write_all(pages: &[(Vec<u8>, bool)], format: Format, dir: &Path, stem: &str, made: &mut Vec<PathBuf>) -> std::io::Result<()> {
     if format == Format::Tiff && pages.len() > 1 {
         let (path, file) = claim_name(dir, stem, "tif")?;
-        let mut enc = tiff::encoder::TiffEncoder::new(std::io::BufWriter::new(file)).map_err(std::io::Error::other)?;
+        made.push(path);
+        return tiff_to(pages, &file);
+    }
+    let one = pages.len() == 1;
+    for (i, (bytes, _)) in pages.iter().enumerate() {
+        let name = if one { stem.to_string() } else { format!("{stem} {}", i + 1) };
+        let (path, mut file) = claim_name(dir, &name, format.ext())?;
+        made.push(path);
+        match format {
+            Format::Jpeg => std::io::Write::write_all(&mut file, bytes)?,
+            Format::Png | Format::Tiff => {
+                let img = image::load_from_memory(bytes).map_err(std::io::Error::other)?;
+                let kind = if format == Format::Png { ImageFormat::Png } else { ImageFormat::Tiff };
+                encode_to(&img, kind, &file)?;
+            }
+            Format::Pdf => return Err(std::io::Error::other("a picture cannot be saved as a PDF")),
+        }
+        file.sync_all()?;
+    }
+    Ok(())
+}
+
+fn encode_to<W: std::io::Write + std::io::Seek>(img: &image::DynamicImage, kind: ImageFormat, to: W) -> std::io::Result<()> {
+    let mut w = std::io::BufWriter::new(to);
+    img.write_to(&mut w, kind).map_err(std::io::Error::other)?;
+    std::io::Write::flush(&mut w)
+}
+
+fn tiff_to<W: std::io::Write + std::io::Seek>(pages: &[(Vec<u8>, bool)], to: W) -> std::io::Result<()> {
+    let mut w = std::io::BufWriter::new(to);
+    {
+        let mut enc = tiff::encoder::TiffEncoder::new(&mut w).map_err(std::io::Error::other)?;
         for (bytes, grey) in pages {
             let img = image::load_from_memory(bytes).map_err(std::io::Error::other)?;
             if *grey {
@@ -107,24 +149,8 @@ pub fn write_pictures(pages: &[(Vec<u8>, bool)], format: Format, dir: &Path, ste
                 enc.write_image::<tiff::encoder::colortype::RGB8>(c.width(), c.height(), c.as_raw()).map_err(std::io::Error::other)?;
             }
         }
-        return Ok(vec![path]);
     }
-    let one = pages.len() == 1;
-    for (i, (bytes, _)) in pages.iter().enumerate() {
-        let name = if one { stem.to_string() } else { format!("{stem} {}", i + 1) };
-        let (path, mut file) = claim_name(dir, &name, format.ext())?;
-        match format {
-            Format::Jpeg => std::io::Write::write_all(&mut file, bytes)?,
-            Format::Png | Format::Tiff => {
-                let img = image::load_from_memory(bytes).map_err(std::io::Error::other)?;
-                let kind = if format == Format::Png { ImageFormat::Png } else { ImageFormat::Tiff };
-                img.write_to(&mut std::io::BufWriter::new(file), kind).map_err(std::io::Error::other)?;
-            }
-            Format::Pdf => return Err(std::io::Error::other("a picture cannot be saved as a PDF")),
-        }
-        out.push(path);
-    }
-    Ok(out)
+    std::io::Write::flush(&mut w)
 }
 
 #[cfg(test)]
@@ -193,5 +219,43 @@ mod tests {
             n += 1;
         }
         assert_eq!(n, 3);
+    }
+
+    struct Full;
+    impl std::io::Write for Full {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(std::io::ErrorKind::StorageFull))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    impl std::io::Seek for Full {
+        fn seek(&mut self, _: std::io::SeekFrom) -> std::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn a_full_disk_is_an_error_for_png_and_tiff() {
+        let img = DynamicImage::ImageRgb8(RgbImage::from_pixel(8, 8, Rgb([1, 2, 3])));
+        assert!(encode_to(&img, ImageFormat::Png, Full).is_err());
+        assert!(encode_to(&img, ImageFormat::Tiff, Full).is_err());
+        let j = jpeg(&img).unwrap();
+        assert!(tiff_to(&[(j.clone(), false), (j, true)], Full).is_err());
+    }
+
+    #[test]
+    fn a_failed_save_leaves_no_files_behind() {
+        crate::words::ready();
+        let d = tmp("failed");
+        let img = DynamicImage::ImageRgb8(RgbImage::from_pixel(8, 8, Rgb([1, 2, 3])));
+        let good = jpeg(&img).unwrap();
+        let r = write_pictures(&[(good.clone(), false), (b"not a picture".to_vec(), false)], Format::Png, &d, "Scan");
+        assert!(r.is_err());
+        assert_eq!(std::fs::read_dir(&d).unwrap().count(), 0);
+        let r = write_pictures(&[(good, false), (b"nope".to_vec(), false)], Format::Tiff, &d, "Scan");
+        assert!(r.is_err());
+        assert_eq!(std::fs::read_dir(&d).unwrap().count(), 0);
     }
 }

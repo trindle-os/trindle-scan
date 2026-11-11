@@ -9,10 +9,10 @@ license = "GPL-3.0-or-later"
 description = "Scanning for Trindle: find a network scanner, scan, tidy the pages, save as PDF or pictures"
 
 [dependencies]
-trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "7a039de13db7b259629ee19aad62c4b696c40d28" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
 libc = "0.2"
-trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "7a039de13db7b259629ee19aad62c4b696c40d28" }
 aes = "0.8"
 cbc = { version = "0.1", features = ["alloc"] }
 sha2 = "0.10"
@@ -20,10 +20,10 @@ flate2 = "1"
 tiff = "0.11"
 
 [build-dependencies]
-trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74" }
+trindle-common = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "7a039de13db7b259629ee19aad62c4b696c40d28" }
 
 [dev-dependencies]
-trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "3b1e06bc4d4ccb94b9d7b876feecc37aa4765e74", features = ["testing"] }
+trindle-toolkit = { git = "https://github.com/trindle-os/trindle-toolkit", rev = "7a039de13db7b259629ee19aad62c4b696c40d28", features = ["testing"] }
 tiny-skia = "0.12"
 tempfile = "3"
 

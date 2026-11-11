@@ -36,14 +36,12 @@ fn on_path(path: &std::ffi::OsStr) -> Option<PathBuf> {
 
 #[derive(Debug, PartialEq)]
 pub enum Fail {
-
     Stopped,
 
     Page(String),
 }
 
 impl Engine {
-
     pub fn find() -> Option<Engine> {
         let here = std::env::current_exe().ok()?.parent()?.to_path_buf();
         let own = here.join("tesseract");
@@ -61,6 +59,8 @@ impl Engine {
 
     fn command(&self) -> Command {
         let mut c = Command::new(&self.exe);
+
+        c.env("LC_ALL", "C");
         if let Some(d) = &self.data {
             c.env("TESSDATA_PREFIX", d);
         }
@@ -119,11 +119,29 @@ impl Engine {
 
 pub fn language_name(code: &str) -> String {
     const NAMES: [(&str, &str); 23] = [
-        ("eng", "English"), ("fra", "Fran\u{e7}ais"), ("deu", "Deutsch"), ("spa", "Espa\u{f1}ol"), ("ita", "Italiano"), ("por", "Portugu\u{ea}s"),
-        ("nld", "Nederlands"), ("pol", "Polski"), ("swe", "Svenska"), ("dan", "Dansk"), ("nor", "Norsk"), ("fin", "Suomi"),
-        ("ces", "\u{10c}e\u{161}tina"), ("hun", "Magyar"), ("ron", "Rom\u{e2}n\u{103}"), ("tur", "T\u{fc}rk\u{e7}e"),
-        ("ell", "\u{395}\u{3bb}\u{3bb}\u{3b7}\u{3bd}\u{3b9}\u{3ba}\u{3ac}"), ("rus", "\u{420}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}"),
-        ("ukr", "\u{423}\u{43a}\u{440}\u{430}\u{457}\u{43d}\u{441}\u{44c}\u{43a}\u{430}"), ("cym", "Cymraeg"), ("gle", "Gaeilge"), ("cat", "Catal\u{e0}"), ("ara", "\u{627}\u{644}\u{639}\u{631}\u{628}\u{64a}\u{629}"),
+        ("eng", "English"),
+        ("fra", "Fran\u{e7}ais"),
+        ("deu", "Deutsch"),
+        ("spa", "Espa\u{f1}ol"),
+        ("ita", "Italiano"),
+        ("por", "Portugu\u{ea}s"),
+        ("nld", "Nederlands"),
+        ("pol", "Polski"),
+        ("swe", "Svenska"),
+        ("dan", "Dansk"),
+        ("nor", "Norsk"),
+        ("fin", "Suomi"),
+        ("ces", "\u{10c}e\u{161}tina"),
+        ("hun", "Magyar"),
+        ("ron", "Rom\u{e2}n\u{103}"),
+        ("tur", "T\u{fc}rk\u{e7}e"),
+        ("ell", "\u{395}\u{3bb}\u{3bb}\u{3b7}\u{3bd}\u{3b9}\u{3ba}\u{3ac}"),
+        ("rus", "\u{420}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}"),
+        ("ukr", "\u{423}\u{43a}\u{440}\u{430}\u{457}\u{43d}\u{441}\u{44c}\u{43a}\u{430}"),
+        ("cym", "Cymraeg"),
+        ("gle", "Gaeilge"),
+        ("cat", "Catal\u{e0}"),
+        ("ara", "\u{627}\u{644}\u{639}\u{631}\u{628}\u{64a}\u{629}"),
     ];
     NAMES.iter().find(|(c, _)| *c == code).map(|(_, n)| n.to_string()).unwrap_or_else(|| code.to_string())
 }
@@ -170,6 +188,14 @@ pub fn read_pages(engine: &Engine, pages: &mut [PdfPage], language: &str, mut pr
 #[cfg(test)]
 pub mod tests {
     use super::*;
+
+    #[test]
+    fn the_engine_is_asked_in_the_plain_locale() {
+        let e = Engine::at("tesseract".into());
+        let c = e.command();
+        let env: Vec<_> = c.get_envs().filter(|(k, v)| *k == "LC_ALL" && *v == Some(std::ffi::OsStr::new("C"))).collect();
+        assert_eq!(env.len(), 1);
+    }
     use std::os::unix::fs::PermissionsExt;
     use std::sync::Arc;
 

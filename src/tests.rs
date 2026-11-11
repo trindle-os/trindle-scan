@@ -118,23 +118,29 @@ fn find_scan_list_save() {
     let path = dir.join("test.pdf");
     let p = path.clone();
     let mut stage = 0;
-    let app = run(2, profile_with(|p| { p.source = Source::Feeder; }), move |a, _| {
-        match stage {
-            0 => {
-                a.update(Msg::Scan);
-                stage = 1;
+    let app = run(
+        2,
+        profile_with(|p| {
+            p.source = Source::Feeder;
+        }),
+        move |a, _| {
+            match stage {
+                0 => {
+                    a.update(Msg::Scan);
+                    stage = 1;
+                }
+                1 if !a.scanning && a.arrived > 0 => {
+                    assert_eq!(a.list.pages.len(), 2);
+                    assert!(a.problem.is_none(), "{:?}", a.problem);
+                    a.event(Event::SaveTo(p.clone()));
+                    stage = 2;
+                }
+                2 if !a.saving => return true,
+                _ => {}
             }
-            1 if !a.scanning && a.arrived > 0 => {
-                assert_eq!(a.list.pages.len(), 2);
-                assert!(a.problem.is_none(), "{:?}", a.problem);
-                a.event(Event::SaveTo(p.clone()));
-                stage = 2;
-            }
-            2 if !a.saving => return true,
-            _ => {}
-        }
-        false
-    });
+            false
+        },
+    );
     assert!(app.borrow().problem.is_none());
     let pdf = std::fs::read(&path).expect("the PDF was not written");
     let _ = std::fs::remove_file(&path);
@@ -147,21 +153,28 @@ fn save_searchable(name: &str) -> (Vec<u8>, String) {
     let path = dir.join(format!("{name}.pdf"));
     let p = path.clone();
     let mut stage = 0;
-    let app = run(2, profile_with(|p| { p.source = Source::Feeder; p.searchable = true; }), move |a, _| {
-        match stage {
-            0 => {
-                a.update(Msg::Scan);
-                stage = 1;
+    let app = run(
+        2,
+        profile_with(|p| {
+            p.source = Source::Feeder;
+            p.searchable = true;
+        }),
+        move |a, _| {
+            match stage {
+                0 => {
+                    a.update(Msg::Scan);
+                    stage = 1;
+                }
+                1 if !a.scanning && a.arrived > 0 => {
+                    a.event(Event::SaveTo(p.clone()));
+                    stage = 2;
+                }
+                2 if !a.saving => return true,
+                _ => {}
             }
-            1 if !a.scanning && a.arrived > 0 => {
-                a.event(Event::SaveTo(p.clone()));
-                stage = 2;
-            }
-            2 if !a.saving => return true,
-            _ => {}
-        }
-        false
-    });
+            false
+        },
+    );
     let note = app.borrow().note.clone();
     assert!(app.borrow().problem.is_none(), "{:?}", app.borrow().problem);
     let pdf = std::fs::read(&path).expect("the PDF was not written");
@@ -225,19 +238,25 @@ fn auto_save_writes_a_file_and_clears_the_list() {
 fn turning_the_stack_over_puts_the_backs_in_order() {
     crate::words::ready();
     let mut stage = 0;
-    let app = run(2, profile_with(|p| { p.source = Source::FeederManualBoth; }), move |a, _| {
-        if stage == 0 {
-            a.update(Msg::Scan);
-            stage = 1;
-        } else if stage == 1 && !a.scanning && a.turn_over.is_some() {
-            assert_eq!(a.list.pages.len(), 2);
-            a.update(Msg::Scan);
-            stage = 2;
-        } else if stage == 2 && !a.scanning && a.session.is_none() {
-            return true;
-        }
-        false
-    });
+    let app = run(
+        2,
+        profile_with(|p| {
+            p.source = Source::FeederManualBoth;
+        }),
+        move |a, _| {
+            if stage == 0 {
+                a.update(Msg::Scan);
+                stage = 1;
+            } else if stage == 1 && !a.scanning && a.turn_over.is_some() {
+                assert_eq!(a.list.pages.len(), 2);
+                a.update(Msg::Scan);
+                stage = 2;
+            } else if stage == 2 && !a.scanning && a.session.is_none() {
+                return true;
+            }
+            false
+        },
+    );
     let ids: Vec<u32> = app.borrow().list.pages.iter().map(|p| p.id).collect();
     assert_eq!(ids, vec![1, 4, 2, 3], "front 1, back 1, front 2, back 2 with the backs turned over");
 }
@@ -590,12 +609,16 @@ fn same_named_scanners_stay_apart_and_a_failed_check_is_said() {
     let again = Scanner { root: "scan".into(), ..one };
     let i = a.add_scanner(again);
     assert_eq!((a.scanners.len(), a.scanners[i].root.as_str()), (2, "scan"));
-    a.problem = Some(t!("scan-main-note-checking-address").into());
+    a.checking = true;
     a.event(Event::Checked(Some("No answer".into())));
     assert_eq!(a.problem.as_deref(), Some("No answer"));
     a.problem = Some(t!("scan-main-note-checking-address").into());
+    a.checking = true;
     a.event(Event::Checked(None));
     assert!(a.problem.is_none());
+    a.problem = Some("Another problem".into());
+    a.event(Event::Checked(None));
+    assert_eq!(a.problem.as_deref(), Some("Another problem"), "a check nobody is waiting for leaves other words alone");
 }
 
 #[test]
@@ -706,4 +729,154 @@ fn zoom_keys_are_taken_in_the_viewer_but_digits_are_not() {
     let key = |sym: Keysym| Input::Key { sym, text: None, mods: Mods::default(), repeat: false };
     assert!(matches!(a.intercept(&key(Keysym::plus), true), Some(Msg::Keys(..))));
     assert!(a.intercept(&key(Keysym::_1), true).is_none());
+}
+
+#[test]
+fn using_the_glass_holds_until_the_scan_is_done() {
+    let mut a = one_page_app();
+    a.book.add(Profile::new("Hand"));
+    a.book.profiles[0].source = Source::FeederManualBoth;
+    a.book.profiles[0].ask_more = true;
+    a.update(Msg::UseGlass);
+    assert!(a.force_glass, "the choice is still there when the scan finishes");
+    a.arrived = 1;
+    a.session = Some(vec![a.list.pages[0].id]);
+    a.after_run();
+    assert!(a.turn_over.is_none(), "a glass page is not turned over");
+    assert!(a.more, "and the question for another page comes");
+    a.finish_session(false);
+    assert!(!a.force_glass);
+}
+
+#[test]
+fn the_viewer_bar_acts_on_the_page_shown() {
+    let mut a = one_page_app();
+    let id = a.list.new_id();
+    a.list.pages.push(Page::new(id, jpeg(), DynamicImage::new_rgb8(20, 28), 200, 280, false));
+    a.list.select_only(&[0]);
+    a.open_view(1);
+    a.update(Msg::RotateRight);
+    assert_eq!(a.list.pages[0].rot, 0);
+    assert_eq!(a.list.pages[1].rot, 90);
+    let w = a.view_img.as_ref().unwrap().dimensions();
+    assert!(w.0 > w.1, "the picture shown is turned too");
+    a.update(Msg::Delete);
+    assert_eq!(a.list.pages.len(), 1);
+    assert_eq!(a.list.pages[0].rot, 0, "the page that was shown went, the other stayed");
+}
+
+#[test]
+fn a_lock_made_through_a_link_is_not_used_and_the_target_is_not_cut() {
+    crate::words::ready();
+    let d = tmp("locklink");
+    let victim = d.join("victim.txt");
+    std::fs::write(&victim, "keep me").unwrap();
+    let keep = d.join("pages");
+    std::os::unix::fs::symlink(&victim, d.join("pages.lock")).unwrap();
+    let a = one_page_app().with_keep(keep);
+    assert!(a.keep_dir.is_none());
+    assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep me");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn a_page_that_cannot_be_kept_is_said_and_old_files_stay_until_new_ones_exist() {
+    crate::words::ready();
+    let d = tmp("unkept");
+    let keep = d.join("pages");
+    assert!(settings::private_folder(&keep));
+    let old = keep.join("000007.jpg");
+    std::fs::write(&old, jpeg()).unwrap();
+    let mut a = one_page_app().with_keep(keep.clone());
+    assert_eq!(a.recoverable, 1);
+    let pg = a.list.pages[0].clone();
+    a.keep(&pg);
+    assert_eq!(a.unkept, 1, "nothing is written while old pages wait");
+    a.say_unkept();
+    assert!(a.problem.as_ref().is_some_and(|p| p.contains("recovery folder")));
+    a.problem = None;
+    let mode = |m| std::fs::set_permissions(&keep, std::os::unix::fs::PermissionsExt::from_mode(m)).unwrap();
+    mode(0o500);
+    let items = vec![(jpeg(), DynamicImage::new_rgb8(20, 28), 200, 280, false)];
+    a.event(Event::Recovered(items, vec![old.clone()]));
+    mode(0o700);
+    assert!(old.exists(), "the old file stays when the new copy could not be written");
+    assert!(a.problem.is_some());
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn a_hand_save_that_fails_leaves_the_old_file_whole() {
+    let d = tmp("replace");
+    let path = d.join("Bills.pdf");
+    std::fs::write(&path, "the old file").unwrap();
+    let r = saving::replace_file(&path, |mut f| {
+        std::io::Write::write_all(&mut f, b"half")?;
+        Err(std::io::Error::from(std::io::ErrorKind::StorageFull))
+    });
+    assert!(r.is_err());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "the old file");
+    assert_eq!(std::fs::read_dir(&d).unwrap().count(), 1, "no half file is left beside it");
+    saving::replace_file(&path, |mut f| std::io::Write::write_all(&mut f, b"new")).unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
+fn a_save_remembers_its_folder_whatever_words_it_gave() {
+    crate::words::ready();
+    let mut a = one_page_app();
+    let d = tmp("savedto").to_path_buf();
+    a.event(Event::Saved(Ok(SavedTo { dir: d.clone(), words: "three files, as the words say".into() })));
+    assert_eq!(a.last_saved_dir.as_deref(), Some(d.as_path()));
+}
+
+#[test]
+fn what_was_added_is_announced_when_the_files_have_loaded() {
+    crate::words::ready();
+    let mut a = one_page_app();
+    a.note = "Old note".into();
+    a.announce = None;
+    a.event(Event::Loaded(vec![(jpeg(), DynamicImage::new_rgb8(20, 28), 200, 280, false)], 0));
+    assert_eq!(a.announce.as_deref(), Some(a.note.as_str()));
+    assert_ne!(a.note, "Old note");
+}
+
+#[test]
+fn the_recognition_languages_arrive_as_an_event() {
+    let mut a = one_page_app();
+    assert!(a.ocr_langs.is_empty());
+    a.event(Event::Languages(vec!["eng".into(), "fra".into()]));
+    assert_eq!(a.ocr_langs, vec!["eng".to_string(), "fra".to_string()]);
+}
+
+#[test]
+fn a_black_and_white_page_is_read_once_for_a_pdf() {
+    let mut a = one_page_app();
+    a.list.pages[0].bw = true;
+    let cut = a.list.pages[0].cut();
+    let (j, w, h, pic) = cut.final_with_picture(true).unwrap();
+    assert!(pic.is_some() && w == 200 && h == 280 && !j.is_empty());
+    let parts = saving::pdf_parts(&[cut]).unwrap();
+    assert!(parts[0].mono.is_some());
+}
+
+#[test]
+fn a_split_pdf_save_that_fails_part_way_leaves_no_files() {
+    let d = tmp("splitfail");
+    let page = || pdf::PdfPage { words: Vec::new(), jpeg: Arc::new(vec![0xFF, 0xD8, 0xFF, 0xD9]), mono: None, width: 10, height: 20, grey: false, page: (595.0, 842.0) };
+    let calls = Cell::new(0);
+    let r = saving::write_pdfs_using(
+        &[page(), page(), page()],
+        |_, mut w| {
+            calls.set(calls.get() + 1);
+            std::io::Write::write_all(&mut w, b"%PDF")?;
+            if calls.get() == 2 { Err(std::io::Error::from(std::io::ErrorKind::StorageFull)) } else { std::io::Write::flush(&mut w) }
+        },
+        1,
+        &d.join("Bills.pdf"),
+        true,
+    );
+    assert!(r.is_err());
+    assert_eq!(std::fs::read_dir(&d).unwrap().count(), 0);
 }

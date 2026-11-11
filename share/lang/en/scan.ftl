@@ -87,6 +87,13 @@ scan-main-note-added-failed =
 # Red words when the folder of saved files could not be opened.
 scan-main-error-open-folder = The folder could not be opened.
 
+# Red words when pages could not be copied to the recovery folder, so a crash would lose them.
+scan-main-error-not-kept =
+    { $n ->
+        [one] One page could not be copied to the recovery folder, so a crash would lose it.
+       *[other] { $n } pages could not be copied to the recovery folder, so a crash would lose them.
+    }
+
 # Note under the bar after pages from last time were brought back.
 scan-main-note-recovered =
     Recovered { $n ->

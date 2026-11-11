@@ -1,10 +1,10 @@
 //! USB scanners through SANE, loaded at run time; network names (net, airscan, escl) are left out of the list.
 
-use crate::settings::BASE_DPI;
 use crate::escl::{self, Caps, Fail, Settings};
+use crate::settings::BASE_DPI;
 use image::ExtendedColorType;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::cell::Cell;
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use trindle_toolkit::t;
@@ -94,7 +94,6 @@ fn lib() -> Option<&'static Lib> {
 
 #[allow(clippy::missing_transmute_annotations)]
 fn open_lib() -> Option<Lib> {
-
     unsafe {
         let name = CString::new("libsane.so.1").ok()?;
         let h = libc::dlopen(name.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL);
@@ -145,12 +144,7 @@ fn settle() {
 }
 
 fn text(p: *const c_char) -> String {
-    if p.is_null() {
-        String::new()
-    } else {
-
-        unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
-    }
+    if p.is_null() { String::new() } else { unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned() }
 }
 
 fn missing() -> Fail {
@@ -231,7 +225,6 @@ struct Open {
 
 impl Drop for Open {
     fn drop(&mut self) {
-
         unsafe { (self.lib.close)(self.h) };
         if self.scanned.get() && self.hardware {
             *LAST_SCAN.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
@@ -244,10 +237,24 @@ struct Opt {
     index: c_int,
     kind: c_int,
     unit: c_int,
+    cap: c_int,
     size: usize,
     strings: Vec<String>,
     words: Vec<i32>,
     range: Option<(i32, i32, i32)>,
+}
+
+fn inside(v: i32, lo: i32, hi: i32) -> i32 {
+    v.clamp(lo.min(hi), lo.max(hi))
+}
+
+const CAP_SOFT_SELECT: c_int = 1;
+const CAP_INACTIVE: c_int = 32;
+
+impl Opt {
+    fn settable(&self) -> bool {
+        self.cap & CAP_SOFT_SELECT != 0 && self.cap & CAP_INACTIVE == 0
+    }
 }
 
 fn device_name(device: &str) -> Result<CString, Fail> {
@@ -273,7 +280,6 @@ impl Open {
     fn option(&self, name: &str) -> Option<Opt> {
         let mut i = 1;
         loop {
-
             let d = unsafe { (self.lib.option_descriptor)(self.h, i) };
             if d.is_null() {
                 return None;
@@ -281,7 +287,7 @@ impl Open {
 
             let d = unsafe { &*d };
             if text(d.name) == name {
-                let mut o = Opt { name: name.to_string(), index: i, kind: d.kind, unit: d.unit, size: d.size.max(0) as usize, strings: Vec::new(), words: Vec::new(), range: None };
+                let mut o = Opt { name: name.to_string(), index: i, kind: d.kind, unit: d.unit, cap: d.cap, size: d.size.max(0) as usize, strings: Vec::new(), words: Vec::new(), range: None };
 
                 unsafe {
                     match d.constraint_kind {
@@ -335,7 +341,7 @@ impl Open {
             _ => return Err(refused(&o.name)),
         };
         if let Some((lo, hi, _)) = o.range {
-            word = word.clamp(lo, hi);
+            word = inside(word, lo, hi);
         } else if !o.words.is_empty() {
             word = *o.words.iter().min_by_key(|w| (**w as i64 - word as i64).abs()).unwrap_or(&word);
         }
@@ -404,7 +410,8 @@ pub fn capabilities(device: &str) -> Result<Caps, Fail> {
 }
 
 fn apply_settings(dev: &Open, s: &Settings) -> Result<(), Fail> {
-    if let Some(src) = dev.option("source") {
+    let get = |name: &str| dev.option(name).filter(Opt::settable);
+    if let Some(src) = get("source") {
         let choice = if s.feeder && s.duplex {
             pick(&src.strings, &["duplex", "both"], &[])
         } else if s.feeder {
@@ -416,7 +423,7 @@ fn apply_settings(dev: &Open, s: &Settings) -> Result<(), Fail> {
             dev.set_string(&src, c)?;
         }
     }
-    if let Some(m) = dev.option("mode") {
+    if let Some(m) = get("mode") {
         let words: &[&str] = match s.mode {
             escl::RGB => &["color", "colour"],
             escl::GREY => &["gray", "grey"],
@@ -426,12 +433,12 @@ fn apply_settings(dev: &Open, s: &Settings) -> Result<(), Fail> {
             dev.set_string(&m, c)?;
         }
     }
-    if let Some(r) = dev.option("resolution") {
+    if let Some(r) = get("resolution") {
         dev.set_number(&r, s.dpi as f64)?;
     }
     let (w_mm, h_mm) = (s.width as f64 * 25.4 / BASE_DPI as f64, s.height as f64 * 25.4 / BASE_DPI as f64);
     for (name, value) in [("tl-x", 0.0), ("tl-y", 0.0), ("br-x", w_mm), ("br-y", h_mm)] {
-        if let Some(o) = dev.option(name) {
+        if let Some(o) = get(name) {
             let v = if o.unit == UNIT_MM { value } else { value / 25.4 * s.dpi as f64 };
             dev.set_number(&o, v)?;
         }
@@ -447,7 +454,6 @@ pub fn scan(device: &str, s: &Settings, stop: impl Fn() -> bool, mut page: impl 
     let mut n = 0;
     loop {
         if stop() {
-
             unsafe { (lib.cancel)(dev.h) };
             return Ok(n);
         }
@@ -489,7 +495,6 @@ fn read_page(dev: &Open, stop: &impl Fn() -> bool) -> Result<Option<Vec<u8>>, Fa
     let mut chunk = vec![0u8; 1 << 16];
     loop {
         if stop() {
-
             unsafe { (lib.cancel)(dev.h) };
             return Ok(None);
         }
@@ -497,6 +502,10 @@ fn read_page(dev: &Open, stop: &impl Fn() -> bool) -> Result<Option<Vec<u8>>, Fa
 
         let st = unsafe { (lib.read)(dev.h, chunk.as_mut_ptr(), chunk.len() as c_int, &mut got) };
         data.extend_from_slice(&chunk[..got.max(0) as usize]);
+        if data.len() > escl::LONGEST_REPLY {
+            unsafe { (lib.cancel)(dev.h) };
+            return Err(Fail::Other(t!("scan-sane-frame").into()));
+        }
         match st {
             GOOD => {}
             EOF => break,
@@ -513,6 +522,9 @@ fn jpeg_of(p: &Params, data: &[u8]) -> Result<Vec<u8>, Fail> {
         FRAME_RGB => 3,
         _ => return Err(Fail::Other(t!("scan-sane-frame").into())),
     };
+    if p.depth == 1 && channels == 3 {
+        return Err(Fail::Other(t!("scan-sane-frame").into()));
+    }
     let needed = match p.depth {
         1 => w.div_ceil(8),
         16 => w * channels * 2,
@@ -544,15 +556,38 @@ fn jpeg_of(p: &Params, data: &[u8]) -> Result<Vec<u8>, Fail> {
     }
     let colour = if channels == 3 { ExtendedColorType::Rgb8 } else { ExtendedColorType::L8 };
     let mut out = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90)
-        .encode(&pixels, w as u32, h as u32, colour)
-        .map_err(|e| Fail::Other(e.to_string()))?;
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 90).encode(&pixels, w as u32, h as u32, colour).map_err(|e| Fail::Other(e.to_string()))?;
     Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn opt(cap: c_int) -> Opt {
+        Opt { name: "source".into(), index: 1, kind: 3, unit: 0, cap, size: 0, strings: vec![], words: vec![], range: None }
+    }
+
+    #[test]
+    fn an_inactive_or_fixed_option_is_not_set() {
+        assert!(opt(CAP_SOFT_SELECT).settable());
+        assert!(!opt(CAP_SOFT_SELECT | CAP_INACTIVE).settable());
+        assert!(!opt(0).settable());
+    }
+
+    #[test]
+    fn a_range_the_wrong_way_round_does_not_panic() {
+        assert_eq!(inside(5, 10, 2), 5);
+        assert_eq!(inside(50, 10, 2), 10);
+        assert_eq!(inside(0, 2, 10), 2);
+    }
+
+    #[test]
+    fn a_one_bit_colour_frame_is_refused() {
+        crate::words::ready();
+        let p = Params { format: FRAME_RGB, last_frame: 1, bytes_per_line: 2, pixels_per_line: 8, lines: 4, depth: 1 };
+        assert!(jpeg_of(&p, &[0u8; 8]).is_err());
+    }
 
     #[test]
     fn eight_bit_colour_and_one_bit_grey_become_pictures() {
@@ -621,12 +656,20 @@ mod tests {
         crate::words::ready();
         for round in 0..4 {
             let found = list();
-            let Some(f) = found.iter().find(|f| f.device.starts_with("epsonds")) else { println!("ROUND {round} NOT FOUND"); return };
+            let f = found.iter().find(|f| f.device.starts_with("epsonds")).unwrap_or_else(|| panic!("round {round}: no Epson found"));
             let st = Settings { width: 600, height: 600, dpi: 75, mode: "RGB24", feeder: false, duplex: false };
             let mut n = 0;
             let t = std::time::Instant::now();
-            let r = scan(&f.device, &st, || false, |j| { n += j.len(); });
-            println!("ROUND {round} {:?} bytes {} after {:?}", r.map_err(|e| e.words()), n, t.elapsed());
+            let r = scan(
+                &f.device,
+                &st,
+                || false,
+                |j| {
+                    n += j.len();
+                },
+            );
+            println!("ROUND {round} bytes {n} after {:?}", t.elapsed());
+            assert!(r.is_ok() && n > 0, "round {round}: {:?}", r.map_err(|e| e.words()));
         }
     }
 }

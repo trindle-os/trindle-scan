@@ -1,6 +1,9 @@
 //! A small PDF writer: each page is a picture fitted to its page, written to the file as it goes; a password gives AES-256.
 
-use aes::cipher::{block_padding::{NoPadding, Pkcs7}, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit};
+use aes::cipher::{
+    BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit,
+    block_padding::{NoPadding, Pkcs7},
+};
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::io::Write;
 use std::sync::Arc;
@@ -15,7 +18,6 @@ pub struct Word {
 }
 
 pub struct PdfPage {
-
     pub jpeg: Arc<Vec<u8>>,
 
     pub mono: Option<Vec<u8>>,
@@ -126,7 +128,14 @@ impl Lock {
     }
 
     fn dictionary(&self) -> String {
-        format!("/Filter /Standard /V 5 /R 6 /Length 256 /CF << /StdCF << /AuthEvent /DocOpen /CFM /AESV3 /Length 32 >> >> /StmF /StdCF /StrF /StdCF /P {PERMISSIONS} /O <{}> /U <{}> /OE <{}> /UE <{}> /Perms <{}>", hex(&self.o), hex(&self.u), hex(&self.oe), hex(&self.ue), hex(&self.perms))
+        format!(
+            "/Filter /Standard /V 5 /R 6 /Length 256 /CF << /StdCF << /AuthEvent /DocOpen /CFM /AESV3 /Length 32 >> >> /StmF /StdCF /StrF /StdCF /P {PERMISSIONS} /O <{}> /U <{}> /OE <{}> /UE <{}> /Perms <{}>",
+            hex(&self.o),
+            hex(&self.u),
+            hex(&self.oe),
+            hex(&self.ue),
+            hex(&self.perms)
+        )
     }
 }
 
@@ -183,12 +192,17 @@ impl Letters {
         let mine = &self.letters[k * PER_FONT..((k + 1) * PER_FONT).min(self.letters.len())];
         let names: String = mine.iter().map(|c| format!("/uni{:04X} ", *c as u32 & 0xFFFF)).collect();
         let widths = "500 ".repeat(mine.len());
-        format!("/Type /Font /Subtype /Type1 /BaseFont /Helvetica /FirstChar 1 /LastChar {} /Widths [{widths}] /Encoding << /Type /Encoding /Differences [1 {names}] >> /ToUnicode {to_unicode} 0 R", mine.len())
+        format!(
+            "/Type /Font /Subtype /Type1 /BaseFont /Helvetica /FirstChar 1 /LastChar {} /Widths [{widths}] /Encoding << /Type /Encoding /Differences [1 {names}] >> /ToUnicode {to_unicode} 0 R",
+            mine.len()
+        )
     }
 
     fn to_unicode(&self, k: usize) -> String {
         let mine = &self.letters[k * PER_FONT..((k + 1) * PER_FONT).min(self.letters.len())];
-        let mut out = String::from("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<01> <FF>\nendcodespacerange\n");
+        let mut out = String::from(
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<01> <FF>\nendcodespacerange\n",
+        );
         for (b, chunk) in mine.chunks(100).enumerate() {
             out += &format!("{} beginbfchar\n", chunk.len());
             for (j, c) in chunk.iter().enumerate() {

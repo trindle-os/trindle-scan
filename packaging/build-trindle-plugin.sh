@@ -35,6 +35,10 @@ rm -rf "$plugin" "$out/$id.tar.zst"
 install -d "$plugin/bin" "$plugin/icons"
 install -m 0755 "$target/release/trindle-scan" "$plugin/bin/trindle-scan"
 install -m 0644 "$here/icons/scan-ring.svg" "$plugin/icons/scan-ring.svg"
+if LC_ALL=C grep -aqF -e "/home/" -e "$HOME" "$plugin/bin/trindle-scan"; then
+    echo "the built program holds a path of this computer; check the path remap" >&2
+    exit 1
+fi
 install -m 0644 "$root/LICENSE" "$plugin/LICENSE"
 install -d "$plugin/share/licences"
 install -m 0644 "$root/share/licences/THIRD-PARTY.txt" "$plugin/share/licences/THIRD-PARTY.txt"
@@ -60,7 +64,12 @@ if [ -n "${TESSERACT_ROOT:-}" ]; then
             real="$(readlink -f "$found")"
             install -m 0644 "$real" "$plugin/lib/$name"
             pkg="$(dpkg -S "$real" 2>/dev/null | head -1 | cut -d: -f1)"
-            [ -n "$pkg" ] && [ -f "/usr/share/doc/$pkg/copyright" ] && cp "/usr/share/doc/$pkg/copyright" "$plugin/share/licences/$pkg-copyright"
+            if [ -n "$pkg" ] && [ -f "/usr/share/doc/$pkg/copyright" ]; then
+                cp "/usr/share/doc/$pkg/copyright" "$plugin/share/licences/$pkg-copyright"
+            else
+                echo "no copyright file for $name (package: ${pkg:-unknown})" >&2
+                exit 1
+            fi
             todo="$todo $plugin/lib/$name"
         done
     done

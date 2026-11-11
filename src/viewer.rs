@@ -98,6 +98,7 @@ impl Scan {
                 }
             }
             Msg::Delete => {
+                self.select_viewed();
                 self.list.delete_selected();
                 if let Screen::Viewer(i) = self.screen {
                     match self.list.pages.len() {
@@ -116,10 +117,24 @@ impl Scan {
                 self.list.mark();
                 self.list.pages.retain(|p| !p.saved);
             }
-            Msg::RotateLeft => self.list.edit_selected(|p| p.rotate(270)),
-            Msg::RotateRight => self.list.edit_selected(|p| p.rotate(90)),
-            Msg::Flip => self.list.edit_selected(|p| p.flip_h = !p.flip_h),
+            Msg::RotateLeft => self.edit_viewed(|p| p.rotate(270)),
+            Msg::RotateRight => self.edit_viewed(|p| p.rotate(90)),
+            Msg::Flip => self.edit_viewed(|p| p.flip_h = !p.flip_h),
             _ => {}
+        }
+    }
+
+    fn select_viewed(&mut self) {
+        if let Screen::Viewer(i) = self.screen {
+            self.list.select_only(&[i]);
+        }
+    }
+
+    fn edit_viewed(&mut self, f: impl Fn(&mut Page)) {
+        self.select_viewed();
+        self.list.edit_selected(f);
+        if let Screen::Viewer(i) = self.screen {
+            self.open_view(i);
         }
     }
 
@@ -172,7 +187,6 @@ impl Scan {
             self.list.undo();
         } else if k == Keysym::Delete {
             self.list.delete_selected();
-
         } else if m.alt && k == Keysym::Left {
             self.list.move_selected(-1);
         } else if m.alt && k == Keysym::Right {
@@ -217,10 +231,8 @@ impl Scan {
                 self.draft = (0.0, 0.0, 0.0, 0.0);
                 self.crop_from_draft();
             }
-
             Msg::DropIn(files) if self.screen == Screen::Main => {
                 self.event(Event::Opened(files));
-                self.announce = Some(self.note.clone());
             }
             Msg::DropFailed(why) => self.problem = Some(why),
             Msg::Keys(m, k) => self.keys(m, k),

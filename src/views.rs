@@ -6,7 +6,23 @@ impl Scan {
     pub(super) fn viewer_view(&self, i: usize) -> Node<Msg> {
         let n = self.list.pages.len();
         let Some(img) = self.view_img.clone() else { return self.pages_view() };
-        let (l, t, r, b) = self.draft;
+        let pic = self.viewer_picture(i, n, img);
+        column(vec![
+            row(vec![
+                title(t!("scan-view-page-of", i = i + 1, n = n)),
+                space(),
+                button("go-previous", t!("scan-view-previous")).on_press(Msg::Step(-1)),
+                button("go-next", t!("scan-view-next")).on_press(Msg::Step(1)),
+                word_button(t!("scan-common-back")).on_press(Msg::Back),
+            ])
+            .gap(10.0),
+            row(vec![pic, self.viewer_side().width(Length::Fixed(320.0))]).gap(16.0),
+        ])
+        .gap(12.0)
+        .padding(24.0)
+    }
+
+    fn viewer_picture(&self, i: usize, n: usize, img: Rc<DynamicImage>) -> Node<Msg> {
         let (view, crop_box) = (self.zoom, self.crop_box);
         let pic = drawing(VIEW_AREA, t!("scan-view-page-of", i = i + 1, n = n), move |canvas, pen| {
             let k = pen.scale;
@@ -19,7 +35,7 @@ impl Scan {
         .on_pointer(Msg::ViewPointer)
         .on_scroll(Msg::ViewScroll);
         let (held, panning, whole) = (self.crop_pull.holding(), self.panning && self.zoom_drag.holding(), self.crop_is_whole());
-        let pic = pic.cursor_with(move |x, y| {
+        pic.cursor_with(move |x, y| {
             if panning {
                 return Cursor::Move;
             }
@@ -28,15 +44,19 @@ impl Scan {
             }
             let (cx, cy) = view.to_content(x, y);
             match crop_box.handle_at(cx, cy, crop::GRAB / view.scale()) {
-                Some(crop::Handle::Body) if whole => if view.can_pan() { Cursor::Move } else { Cursor::Arrow },
+                Some(crop::Handle::Body) if whole => pan_or_arrow(view),
                 Some(h) => h.cursor(),
-                None => if view.can_pan() { Cursor::Move } else { Cursor::Arrow },
+                None => pan_or_arrow(view),
             }
-        });
+        })
+    }
+
+    fn viewer_side(&self) -> Node<Msg> {
+        let (l, t, r, b) = self.draft;
         let slide = |name: &str, spoken: &str, v: f32, side: usize| -> Node<Msg> {
             row(vec![form_label(t!("scan-view-crop-value", name = name, value = (v * 100.0).round() as i32)), slider(v * 100.0, 0.0, 45.0, 1.0, spoken, move |x| Msg::Crop(side, x))]).gap(12.0)
         };
-        let side = column(vec![
+        column(vec![
             side_heading(t!("scan-view-zoom-heading")),
             row(vec![word_button(t!("scan-view-zoom-in")).on_press(Msg::Zoom(ZoomBy::In)), word_button(t!("scan-view-zoom-out")).on_press(Msg::Zoom(ZoomBy::Out))]).gap(10.0),
             row(vec![word_button(t!("scan-view-zoom-fit")).on_press(Msg::Zoom(ZoomBy::Fit)), word_button(t!("scan-view-zoom-actual")).on_press(Msg::Zoom(ZoomBy::Actual))]).gap(10.0),
@@ -44,7 +64,18 @@ impl Scan {
             side_heading(t!("scan-view-crop-heading")),
             note(t!("scan-view-crop-note")),
             form_label(t!("scan-view-crop-shape")),
-            choice(vec![t!("scan-view-crop-shape-free").into(), t!("scan-view-crop-shape-square").into(), t!("scan-view-crop-shape-4-3").into(), t!("scan-view-crop-shape-3-2").into(), t!("scan-view-crop-shape-16-9").into()], self.ratio, t!("scan-view-crop-shape"), Msg::CropRatio),
+            choice(
+                vec![
+                    t!("scan-view-crop-shape-free").into(),
+                    t!("scan-view-crop-shape-square").into(),
+                    t!("scan-view-crop-shape-4-3").into(),
+                    t!("scan-view-crop-shape-3-2").into(),
+                    t!("scan-view-crop-shape-16-9").into(),
+                ],
+                self.ratio,
+                t!("scan-view-crop-shape"),
+                Msg::CropRatio,
+            ),
             slide(t!("scan-view-crop-left"), t!("scan-view-crop-left-spoken"), l, 0),
             slide(t!("scan-view-crop-top"), t!("scan-view-crop-top-spoken"), t, 1),
             slide(t!("scan-view-crop-right"), t!("scan-view-crop-right-spoken"), r, 2),
@@ -52,13 +83,7 @@ impl Scan {
             word_button(t!("scan-view-crop-remove")).on_press(Msg::NoCrop),
             main_word(t!("scan-view-crop-apply")).on_press(Msg::ApplyCrop),
         ])
-        .gap(10.0);
-        column(vec![
-            row(vec![title(t!("scan-view-page-of", i = i + 1, n = n)), space(), button("go-previous", t!("scan-view-previous")).on_press(Msg::Step(-1)), button("go-next", t!("scan-view-next")).on_press(Msg::Step(1)), word_button(t!("scan-common-back")).on_press(Msg::Back)]).gap(10.0),
-            row(vec![pic, side.width(Length::Fixed(320.0))]).gap(16.0),
-        ])
-        .gap(12.0)
-        .padding(24.0)
+        .gap(10.0)
     }
 
     pub(super) fn bar(&self) -> Node<Msg> {
@@ -66,7 +91,12 @@ impl Scan {
             row(vec![spinner(), label(t!("scan-ocr-reading", i = i, n = n)), word_button(t!("scan-common-cancel")).on_press(Msg::CancelReading)]).gap(12.0)
         } else if let Some(n) = self.batch.pause_left {
             let words = if n == 0 { t!("scan-bar-pause-empty").to_string() } else { t!("scan-bar-pause-wait", n = n) };
-            row(vec![label(words), main_word(if n == 0 { t!("scan-bar-continue") } else { t!("scan-bar-skip-pause") }).on_press(Msg::SkipPause), word_button(t!("scan-common-stop")).on_press(Msg::StopBatch)]).gap(12.0)
+            row(vec![
+                label(words),
+                main_word(if n == 0 { t!("scan-bar-continue") } else { t!("scan-bar-skip-pause") }).on_press(Msg::SkipPause),
+                word_button(t!("scan-common-stop")).on_press(Msg::StopBatch),
+            ])
+            .gap(12.0)
         } else if self.scanning {
             row(vec![spinner(), label(t!("scan-status-scanning", n = self.arrived + 1)), word_button(t!("scan-common-cancel")).on_press(Msg::CancelScan)]).gap(12.0)
         } else if self.more {
@@ -86,7 +116,6 @@ impl Scan {
             button("object-rotate-left", t!("scan-bar-rotate-left")).on_press(Msg::RotateLeft),
             button("object-rotate-right", t!("scan-bar-rotate-right")).on_press(Msg::RotateRight),
             button("object-flip-horizontal", t!("scan-bar-flip")).on_press(Msg::Flip),
-
             button("zoom-in", t!("scan-bar-look")).on_press(Msg::Look),
             button("edit-undo", t!("scan-bar-undo")).on_press(Msg::Undo).on(self.list.can_undo()),
             button("edit-redo", t!("scan-bar-redo")).on_press(Msg::Redo).on(self.list.can_redo()),
@@ -125,14 +154,12 @@ impl Scan {
             .map(|(i, p)| {
                 let img = p.thumb.clone();
                 let tw = self.settings.thumb as f32;
-                let pic = drawing((tw, tw * 4.0 / 3.0), if p.selected { t!("scan-pages-tile-name-selected", i = i + 1, n = n) } else { t!("scan-pages-tile-name", i = i + 1, n = n) }, move |canvas, _| {
-                    let (cw, ch) = (canvas.width(), canvas.height());
-                    let (iw, ih) = img.dimensions();
-                    let s = (cw as f32 / iw as f32).min(ch as f32 / ih as f32);
-                    let (w, h) = (((iw as f32 * s) as u32).max(1), ((ih as f32 * s) as u32).max(1));
-                    picture::draw(canvas, &img, ((cw - w) / 2) as i32, ((ch - h) / 2) as i32, w, h);
-                })
-                .on_press(Msg::Click(i));
+                let pic =
+                    drawing((tw, tw * 4.0 / 3.0), if p.selected { t!("scan-pages-tile-name-selected", i = i + 1, n = n) } else { t!("scan-pages-tile-name", i = i + 1, n = n) }, move |canvas, _| {
+                        let (x, y, w, h) = fitted((canvas.width(), canvas.height()), &img);
+                        picture::draw(canvas, &img, x, y, w, h);
+                    })
+                    .on_press(Msg::Click(i));
                 let caption = if p.saved { t!("scan-pages-caption-saved", i = i + 1) } else { t!("scan-pages-caption", i = i + 1) };
                 card(column(vec![pic, note(caption)]).gap(6.0).padding(8.0)).current(p.selected)
             })
@@ -148,8 +175,8 @@ impl Scan {
             None => t!("scan-browse-top").to_string(),
         };
         items.push(row(vec![label(place), space(), word_button(t!("scan-browse-up")).on_press(Msg::Browse(BrowseMsg::Up)).on(b.dir.is_some())]).gap(10.0));
-        let rows = b.rows(&self.roots);
-        let shown: Vec<Item> = rows
+        let shown: Vec<Item> = b
+            .listing
             .iter()
             .map(|r| {
                 let name = r.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -169,7 +196,13 @@ impl Scan {
         }
         if b.dir.is_some() {
             items.push(form_label(t!("scan-browse-new-folder")));
-            items.push(row(vec![entry(b.new_folder.clone(), t!("scan-browse-new-folder-spoken"), |t| Msg::Browse(BrowseMsg::NewName(t))).on_submit(Msg::Browse(BrowseMsg::MakeFolder)), word_button(t!("scan-browse-make-folder")).on_press(Msg::Browse(BrowseMsg::MakeFolder))]).gap(8.0));
+            items.push(
+                row(vec![
+                    entry(b.new_folder.clone(), t!("scan-browse-new-folder-spoken"), |t| Msg::Browse(BrowseMsg::NewName(t))).on_submit(Msg::Browse(BrowseMsg::MakeFolder)),
+                    word_button(t!("scan-browse-make-folder")).on_press(Msg::Browse(BrowseMsg::MakeFolder)),
+                ])
+                .gap(8.0),
+            );
         }
         if b.purpose == Purpose::SavePdf {
             items.push(form_label(t!("scan-browse-file-name")));
@@ -196,7 +229,14 @@ impl Scan {
         if self.scanning {
             items.push(label(t!("scan-close-scanning")));
         }
-        items.push(row(vec![main_word(t!("scan-bar-save")).on_press(Msg::CloseSave), word_button(t!("scan-close-discard")).on_press(Msg::CloseDiscard), word_button(t!("scan-close-keep")).on_press(Msg::Back)]).gap(16.0));
+        items.push(
+            row(vec![
+                main_word(t!("scan-bar-save")).on_press(Msg::CloseSave),
+                word_button(t!("scan-close-discard")).on_press(Msg::CloseDiscard),
+                word_button(t!("scan-close-keep")).on_press(Msg::Back),
+            ])
+            .gap(16.0),
+        );
         column(items).gap(14.0).padding(24.0)
     }
 
@@ -232,7 +272,9 @@ impl Scan {
             form_label(t!("scan-settings-thumb", n = st.thumb)),
             slider(st.thumb as f32, settings::THUMB_MIN as f32, settings::THUMB_MAX as f32, 10.0, t!("scan-settings-thumb-spoken"), |v| Msg::Set(Set::Thumb(v))),
             form_label(t!("scan-settings-units")),
-            choice(vec![t!("scan-settings-units-mm").into(), t!("scan-settings-units-in").into()], if st.units == Units::Inches { 1 } else { 0 }, t!("scan-settings-units-spoken"), |i| Msg::Set(Set::Units(i))),
+            choice(vec![t!("scan-settings-units-mm").into(), t!("scan-settings-units-in").into()], if st.units == Units::Inches { 1 } else { 0 }, t!("scan-settings-units-spoken"), |i| {
+                Msg::Set(Set::Units(i))
+            }),
             note(t!("scan-settings-example", size = &st.size_words(Size::A4))),
             row(vec![label(t!("scan-settings-remove-saved")), space(), switch(st.remove_saved, t!("scan-settings-remove-saved-spoken"), |b| Msg::Set(Set::RemoveSaved(b)))]),
             section(t!("scan-settings-pdf-heading")),
@@ -245,7 +287,12 @@ impl Scan {
             form_label(t!("scan-settings-pdf-keywords")),
             entry(st.keywords.clone(), t!("scan-settings-pdf-keywords-spoken"), |t| Msg::Set(Set::Keywords(t))),
             form_label(t!("scan-settings-pdf-split")),
-            choice(settings::SPLITS.iter().map(|n| if *n == 0 { t!("scan-settings-pdf-split-all").to_string() } else { n.to_string() }).collect(), settings::SPLITS.iter().position(|n| *n == st.split_every).unwrap_or(0), t!("scan-settings-pdf-split-spoken"), |i| Msg::Set(Set::Split(i))),
+            choice(
+                settings::SPLITS.iter().map(|n| if *n == 0 { t!("scan-settings-pdf-split-all").to_string() } else { n.to_string() }).collect(),
+                settings::SPLITS.iter().position(|n| *n == st.split_every).unwrap_or(0),
+                t!("scan-settings-pdf-split-spoken"),
+                |i| Msg::Set(Set::Split(i)),
+            ),
             form_label(t!("scan-settings-pdf-password")),
             entry(st.password.clone(), t!("scan-settings-pdf-password-spoken"), |t| Msg::Set(Set::Password(t))).secret().key("pass"),
             note(t!("scan-settings-pdf-password-note")),
@@ -263,7 +310,8 @@ impl Scan {
         if self.searching {
             items.push(row(vec![spinner(), label(t!("scan-status-searching")), word_button(t!("scan-common-stop")).on_press(Msg::StopSearch)]).gap(10.0));
         }
-        let rows: Vec<Item> = self.scanners.iter().map(|s| item(s.name.clone()).detail(if s.usb_device().is_some() { t!("scan-scanners-usb").to_string() } else { format!("{}:{}", s.host, s.port) })).collect();
+        let rows: Vec<Item> =
+            self.scanners.iter().map(|s| item(s.name.clone()).detail(if s.usb_device().is_some() { t!("scan-scanners-usb").to_string() } else { format!("{}:{}", s.host, s.port) })).collect();
         if !rows.is_empty() {
             items.push(list(rows, self.chosen, Msg::Pick).height(Length::Shrink));
         } else if !self.searching {
@@ -273,7 +321,10 @@ impl Scan {
             items.push(word_button(t!("scan-bar-search-again")).on_press(Msg::SearchAgain));
         }
         items.push(form_label(t!("scan-scanners-address")));
-        items.push(row(vec![entry(self.address.clone(), t!("scan-scanners-address-spoken"), Msg::Address).on_submit(Msg::AddAddress), word_button(t!("scan-scanners-add")).on_press(Msg::AddAddress)]).gap(8.0));
+        items.push(
+            row(vec![entry(self.address.clone(), t!("scan-scanners-address-spoken"), Msg::Address).on_submit(Msg::AddAddress), word_button(t!("scan-scanners-add")).on_press(Msg::AddAddress)])
+                .gap(8.0),
+        );
         items.push(note(t!("scan-scanners-address-note")));
         items.push(space());
         column(items).gap(12.0).padding(24.0)
@@ -289,7 +340,9 @@ impl Scan {
     }
 
     pub(super) fn profiles_view(&self) -> Node<Msg> {
-        let mut items = vec![row(vec![title(t!("scan-profiles-title")), space(), word_button(t!("scan-profiles-new")).on_press(Msg::NewProfile), word_button(t!("scan-common-back")).on_press(Msg::Back)]).gap(10.0)];
+        let mut items = vec![
+            row(vec![title(t!("scan-profiles-title")), space(), word_button(t!("scan-profiles-new")).on_press(Msg::NewProfile), word_button(t!("scan-common-back")).on_press(Msg::Back)]).gap(10.0),
+        ];
         for (i, p) in self.book.profiles.iter().enumerate() {
             let mut name = p.name.clone();
             if i == self.book.default {
@@ -350,11 +403,8 @@ impl Scan {
             let (w, h) = img.dimensions();
             items.push(note(t!("scan-editor-test-size", w = w, h = h)));
             items.push(drawing((420.0, 520.0), t!("scan-editor-test-picture"), move |canvas, _| {
-                let (cw, ch) = (canvas.width(), canvas.height());
-                let (iw, ih) = img.dimensions();
-                let s = (cw as f32 / iw as f32).min(ch as f32 / ih as f32);
-                let (w, h) = (((iw as f32 * s) as u32).max(1), ((ih as f32 * s) as u32).max(1));
-                picture::draw(canvas, &img, ((cw - w) / 2) as i32, ((ch - h) / 2) as i32, w, h);
+                let (x, y, w, h) = fitted((canvas.width(), canvas.height()), &img);
+                picture::draw(canvas, &img, x, y, w, h);
             }));
         }
     }
@@ -383,89 +433,135 @@ impl Scan {
 }
 
 fn editor_paper(app: &Scan, p: &Profile, items: &mut Vec<Node<Msg>>) {
-        let source = match p.source { Source::Glass => 0, Source::Feeder => 1, Source::FeederBoth => 2, Source::FeederManualBoth => 3 };
-        let can_feeder = app.caps.as_ref().map(|c| c.feeder).unwrap_or(true);
-        let can_two = app.caps.as_ref().map(|c| c.two_sided).unwrap_or(true);
-        let mut sources: Vec<String> = vec![t!("scan-editor-source-glass").into()];
-        let mut source_ix: Vec<usize> = vec![0];
-        if can_feeder {
-            sources.push(t!("scan-editor-source-feeder").into());
-            source_ix.push(1);
-            if can_two {
-                sources.push(t!("scan-editor-source-both").into());
-                source_ix.push(2);
-            }
-            sources.push(t!("scan-editor-source-manual").into());
-            source_ix.push(3);
+    let source = match p.source {
+        Source::Glass => 0,
+        Source::Feeder => 1,
+        Source::FeederBoth => 2,
+        Source::FeederManualBoth => 3,
+    };
+    let can_feeder = app.caps.as_ref().map(|c| c.feeder).unwrap_or(true);
+    let can_two = app.caps.as_ref().map(|c| c.two_sided).unwrap_or(true);
+    let mut sources: Vec<String> = vec![t!("scan-editor-source-glass").into()];
+    let mut source_ix: Vec<usize> = vec![0];
+    if can_feeder {
+        sources.push(t!("scan-editor-source-feeder").into());
+        source_ix.push(1);
+        if can_two {
+            sources.push(t!("scan-editor-source-both").into());
+            source_ix.push(2);
         }
-        let chosen_source = source_ix.iter().position(|s| *s == source).unwrap_or(0);
-        let dpis: Vec<u32> = match &app.caps {
-            Some(c) if !c.resolutions.is_empty() => DPIS.iter().copied().filter(|d| c.resolutions.contains(d)).collect(),
-            _ => DPIS.to_vec(),
-        };
-        let dpi_ix = dpis.iter().position(|d| *d == p.dpi).unwrap_or(0);
-        let si = source_ix.clone();
-        let di = dpis.clone();
-        items.push(form_label(t!("scan-editor-source")));
-        items.push(one_of(sources, Some(chosen_source), t!("scan-editor-source"), move |i| Msg::Edit(Edit::Source(si[i]))));
-        items.push(form_label(t!("scan-editor-size")));
-        items.push(one_of(Size::ALL.iter().map(|s| app.settings.size_words(*s)).collect(), Size::ALL.iter().position(|s| *s == p.size), t!("scan-editor-size"), |i| Msg::Edit(Edit::Size(i))));
-        items.push(form_label(t!("scan-editor-dpi")));
-        items.push(one_of(dpis.iter().map(|d| d.to_string()).collect(), Some(dpi_ix), t!("scan-editor-dpi-spoken"), move |i| Msg::Edit(Edit::Dpi(DPIS.iter().position(|d| *d == di[i]).unwrap_or(4)))));
-        if p.dpi >= 600 {
-            items.push(note(t!("scan-editor-dpi-note")));
-        }
+        sources.push(t!("scan-editor-source-manual").into());
+        source_ix.push(3);
+    }
+    let chosen_source = source_ix.iter().position(|s| *s == source).unwrap_or(0);
+    let dpis: Vec<u32> = match &app.caps {
+        Some(c) if !c.resolutions.is_empty() => DPIS.iter().copied().filter(|d| c.resolutions.contains(d)).collect(),
+        _ => DPIS.to_vec(),
+    };
+    let dpi_ix = dpis.iter().position(|d| *d == p.dpi).unwrap_or(0);
+    let si = source_ix.clone();
+    let di = dpis.clone();
+    items.push(form_label(t!("scan-editor-source")));
+    items.push(one_of(sources, Some(chosen_source), t!("scan-editor-source"), move |i| Msg::Edit(Edit::Source(si[i]))));
+    items.push(form_label(t!("scan-editor-size")));
+    items.push(one_of(Size::ALL.iter().map(|s| app.settings.size_words(*s)).collect(), Size::ALL.iter().position(|s| *s == p.size), t!("scan-editor-size"), |i| Msg::Edit(Edit::Size(i))));
+    items.push(form_label(t!("scan-editor-dpi")));
+    items.push(one_of(dpis.iter().map(|d| d.to_string()).collect(), Some(dpi_ix), t!("scan-editor-dpi-spoken"), move |i| Msg::Edit(Edit::Dpi(DPIS.iter().position(|d| *d == di[i]).unwrap_or(4)))));
+    if p.dpi >= 600 {
+        items.push(note(t!("scan-editor-dpi-note")));
+    }
 }
 
 fn editor_tone(p: &Profile, items: &mut Vec<Node<Msg>>) {
-        items.push(form_label(t!("scan-editor-colour")));
-        items.push(choice(vec![t!("scan-editor-colour-colour").into(), t!("scan-editor-colour-grey").into(), t!("scan-editor-colour-bw").into()], match p.colour { Colour::Full => 0, Colour::Grey => 1, Colour::BlackWhite => 2 }, t!("scan-editor-colour-mode"), |i| Msg::Edit(Edit::Colour(i))));
-        if p.colour == Colour::BlackWhite {
-            items.push(form_label(t!("scan-editor-threshold", n = p.threshold)));
-            items.push(slider(p.threshold as f32, 0.0, 100.0, 1.0, t!("scan-editor-threshold-spoken"), |v| Msg::Edit(Edit::Threshold(v))));
-        }
-        items.push(form_label(t!("scan-editor-brightness", n = p.brightness)));
-        items.push(slider(p.brightness as f32, -100.0, 100.0, 1.0, t!("scan-editor-brightness-spoken"), |v| Msg::Edit(Edit::Brightness(v))));
-        items.push(form_label(t!("scan-editor-contrast", n = p.contrast)));
-        items.push(slider(p.contrast as f32, -100.0, 100.0, 1.0, t!("scan-editor-contrast-spoken"), |v| Msg::Edit(Edit::Contrast(v))));
-        items.push(word_button(t!("scan-editor-reset-tone")).on_press(Msg::Edit(Edit::ResetTone)));
-        items.push(form_label(t!("scan-editor-rotate")));
-        items.push(choice(vec![t!("scan-editor-rotate-none").into(), "90".into(), "180".into(), "270".into()], [0u16, 90, 180, 270].iter().position(|r| *r == p.rotate).unwrap_or(0), t!("scan-editor-rotate-spoken"), |i| Msg::Edit(Edit::Rotate(i))));
-        items.push(row(vec![label(t!("scan-editor-straighten")), space(), switch(p.straighten, t!("scan-editor-straighten"), |b| Msg::Edit(Edit::Straighten(b)))]));
-        items.push(row(vec![label(t!("scan-editor-trim")), space(), switch(p.trim, t!("scan-editor-trim-spoken"), |b| Msg::Edit(Edit::Trim(b)))]));
-        items.push(row(vec![label(t!("scan-editor-skip-blank")), space(), switch(p.skip_blank, t!("scan-editor-skip-blank"), |b| Msg::Edit(Edit::SkipBlank(b)))]));
-        if p.source == Source::Glass {
-            items.push(row(vec![label(t!("scan-editor-ask-more")), space(), switch(p.ask_more, t!("scan-editor-ask-more-spoken"), |b| Msg::Edit(Edit::AskMore(b)))]));
-        }
+    items.push(form_label(t!("scan-editor-colour")));
+    items.push(choice(
+        vec![t!("scan-editor-colour-colour").into(), t!("scan-editor-colour-grey").into(), t!("scan-editor-colour-bw").into()],
+        match p.colour {
+            Colour::Full => 0,
+            Colour::Grey => 1,
+            Colour::BlackWhite => 2,
+        },
+        t!("scan-editor-colour-mode"),
+        |i| Msg::Edit(Edit::Colour(i)),
+    ));
+    if p.colour == Colour::BlackWhite {
+        items.push(form_label(t!("scan-editor-threshold", n = p.threshold)));
+        items.push(slider(p.threshold as f32, 0.0, 100.0, 1.0, t!("scan-editor-threshold-spoken"), |v| Msg::Edit(Edit::Threshold(v))));
+    }
+    items.push(form_label(t!("scan-editor-brightness", n = p.brightness)));
+    items.push(slider(p.brightness as f32, -100.0, 100.0, 1.0, t!("scan-editor-brightness-spoken"), |v| Msg::Edit(Edit::Brightness(v))));
+    items.push(form_label(t!("scan-editor-contrast", n = p.contrast)));
+    items.push(slider(p.contrast as f32, -100.0, 100.0, 1.0, t!("scan-editor-contrast-spoken"), |v| Msg::Edit(Edit::Contrast(v))));
+    items.push(word_button(t!("scan-editor-reset-tone")).on_press(Msg::Edit(Edit::ResetTone)));
+    items.push(form_label(t!("scan-editor-rotate")));
+    items.push(choice(
+        vec![t!("scan-editor-rotate-none").into(), "90".into(), "180".into(), "270".into()],
+        [0u16, 90, 180, 270].iter().position(|r| *r == p.rotate).unwrap_or(0),
+        t!("scan-editor-rotate-spoken"),
+        |i| Msg::Edit(Edit::Rotate(i)),
+    ));
+    items.push(row(vec![label(t!("scan-editor-straighten")), space(), switch(p.straighten, t!("scan-editor-straighten"), |b| Msg::Edit(Edit::Straighten(b)))]));
+    items.push(row(vec![label(t!("scan-editor-trim")), space(), switch(p.trim, t!("scan-editor-trim-spoken"), |b| Msg::Edit(Edit::Trim(b)))]));
+    items.push(row(vec![label(t!("scan-editor-skip-blank")), space(), switch(p.skip_blank, t!("scan-editor-skip-blank"), |b| Msg::Edit(Edit::SkipBlank(b)))]));
+    if p.source == Source::Glass {
+        items.push(row(vec![label(t!("scan-editor-ask-more")), space(), switch(p.ask_more, t!("scan-editor-ask-more-spoken"), |b| Msg::Edit(Edit::AskMore(b)))]));
+    }
 }
 
 fn editor_batch(p: &Profile, items: &mut Vec<Node<Msg>>) {
-        items.push(section(t!("scan-editor-batch-heading")));
-        items.push(choice(vec![t!("scan-editor-batch-one").into(), t!("scan-editor-batch-several").into(), t!("scan-editor-batch-until").into()], p.batch as usize, t!("scan-editor-batch-spoken"), |i| Msg::Edit(Edit::Batch(i))));
-        if p.batch == 1 {
-            items.push(form_label(t!("scan-editor-runs")));
-            items.push(choice(RUNS.iter().map(|r| r.to_string()).collect(), RUNS.iter().position(|r| *r == p.runs).unwrap_or(0), t!("scan-editor-runs"), |i| Msg::Edit(Edit::Runs(i))));
-        }
-        if p.batch > 0 {
-            items.push(form_label(t!("scan-editor-pause")));
-            items.push(choice(PAUSES.iter().map(|r| if *r == 0 { t!("scan-editor-pause-wait").to_string() } else { r.to_string() }).collect(), PAUSES.iter().position(|r| *r == p.pause).unwrap_or(0), t!("scan-editor-pause-spoken"), |i| Msg::Edit(Edit::Pause(i))));
-            items.push(row(vec![label(t!("scan-editor-one-file")), space(), switch(p.one_file, t!("scan-editor-one-file"), |b| Msg::Edit(Edit::OneFile(b)))]));
-        }
+    items.push(section(t!("scan-editor-batch-heading")));
+    items.push(choice(vec![t!("scan-editor-batch-one").into(), t!("scan-editor-batch-several").into(), t!("scan-editor-batch-until").into()], p.batch as usize, t!("scan-editor-batch-spoken"), |i| {
+        Msg::Edit(Edit::Batch(i))
+    }));
+    if p.batch == 1 {
+        items.push(form_label(t!("scan-editor-runs")));
+        items.push(choice(RUNS.iter().map(|r| r.to_string()).collect(), RUNS.iter().position(|r| *r == p.runs).unwrap_or(0), t!("scan-editor-runs"), |i| Msg::Edit(Edit::Runs(i))));
+    }
+    if p.batch > 0 {
+        items.push(form_label(t!("scan-editor-pause")));
+        items.push(choice(
+            PAUSES.iter().map(|r| if *r == 0 { t!("scan-editor-pause-wait").to_string() } else { r.to_string() }).collect(),
+            PAUSES.iter().position(|r| *r == p.pause).unwrap_or(0),
+            t!("scan-editor-pause-spoken"),
+            |i| Msg::Edit(Edit::Pause(i)),
+        ));
+        items.push(row(vec![label(t!("scan-editor-one-file")), space(), switch(p.one_file, t!("scan-editor-one-file"), |b| Msg::Edit(Edit::OneFile(b)))]));
+    }
 }
 
 fn editor_files(p: &Profile, items: &mut Vec<Node<Msg>>) {
-        if p.auto_save {
-            items.push(form_label(t!("scan-editor-folder")));
-            items.push(row(vec![label(if p.folder.is_empty() { t!("scan-settings-no-folder").to_string() } else { p.folder.clone() }), space(), word_button(t!("scan-common-choose")).on_press(Msg::ChooseFolder)]).gap(10.0));
-            items.push(form_label(t!("scan-editor-file-type")));
-            items.push(choice(Format::ALL.iter().map(|f| f.words().to_string()).collect(), Format::ALL.iter().position(|f| *f == p.format).unwrap_or(0), t!("scan-editor-file-type"), |i| Msg::Edit(Edit::Format(i))));
-            items.push(form_label(t!("scan-browse-file-name")));
-            items.push(entry(p.pattern.clone(), t!("scan-editor-pattern-spoken"), |t| Msg::Edit(Edit::Pattern(t))));
-            let example = naming::name_from(p.pattern.split('/').next_back().unwrap_or(""), &p.name, &naming::now(), 1);
-            items.push(note(t!("scan-editor-next-file", name = &format!("{example}.{}", p.format.ext()))));
-            items.push(note(t!("scan-editor-parts", parts = "{year} {month} {day} {hour} {minute} {second} {counter:3} {profile}")));
-            items.push(row(vec![label(t!("scan-editor-clear-after")), space(), switch(p.clear_after, t!("scan-editor-clear-after-spoken"), |b| Msg::Edit(Edit::ClearAfter(b)))]));
-        }
+    if p.auto_save {
+        items.push(form_label(t!("scan-editor-folder")));
+        items.push(
+            row(vec![
+                label(if p.folder.is_empty() { t!("scan-settings-no-folder").to_string() } else { p.folder.clone() }),
+                space(),
+                word_button(t!("scan-common-choose")).on_press(Msg::ChooseFolder),
+            ])
+            .gap(10.0),
+        );
+        items.push(form_label(t!("scan-editor-file-type")));
+        items.push(choice(Format::ALL.iter().map(|f| f.words().to_string()).collect(), Format::ALL.iter().position(|f| *f == p.format).unwrap_or(0), t!("scan-editor-file-type"), |i| {
+            Msg::Edit(Edit::Format(i))
+        }));
+        items.push(form_label(t!("scan-browse-file-name")));
+        items.push(entry(p.pattern.clone(), t!("scan-editor-pattern-spoken"), |t| Msg::Edit(Edit::Pattern(t))));
+        let example = naming::name_from(p.pattern.split('/').next_back().unwrap_or(""), &p.name, &naming::now(), 1);
+        items.push(note(t!("scan-editor-next-file", name = &format!("{example}.{}", p.format.ext()))));
+        items.push(note(t!("scan-editor-parts", parts = "{year} {month} {day} {hour} {minute} {second} {counter:3} {profile}")));
+        items.push(row(vec![label(t!("scan-editor-clear-after")), space(), switch(p.clear_after, t!("scan-editor-clear-after-spoken"), |b| Msg::Edit(Edit::ClearAfter(b)))]));
+    }
+}
+
+fn pan_or_arrow(view: View) -> Cursor {
+    if view.can_pan() { Cursor::Move } else { Cursor::Arrow }
+}
+
+fn fitted(canvas: (u32, u32), img: &DynamicImage) -> (i32, i32, u32, u32) {
+    let (iw, ih) = img.dimensions();
+    let s = (canvas.0 as f32 / iw as f32).min(canvas.1 as f32 / ih as f32);
+    let (w, h) = (((iw as f32 * s) as u32).max(1), ((ih as f32 * s) as u32).max(1));
+    (((canvas.0 - w.min(canvas.0)) / 2) as i32, ((canvas.1 - h.min(canvas.1)) / 2) as i32, w, h)
 }
 
 #[cfg(test)]
@@ -486,10 +582,17 @@ mod look_tests {
     #[test]
     fn viewer_side_panel_headings_are_side_headings() {
         let code = SOURCES[0].1.split("#[cfg(test)]").next().unwrap_or("");
-        let panel = code.split("let side = column(vec![").nth(1).and_then(|s| s.split(".gap(10.0);").next()).unwrap_or("");
+        let panel = code.split("fn viewer_side(").nth(1).and_then(|s| s.split("pub(super) fn bar").next()).unwrap_or("");
         let side_call = ["side_", "heading", "("].concat();
         assert_eq!(panel.matches(&side_call).count(), 2);
         let section_call = ["sec", "tion", "("].concat();
         assert_eq!(panel.matches(&section_call).count(), 0);
+    }
+
+    #[test]
+    fn a_picture_is_fitted_and_centred() {
+        let img = super::DynamicImage::new_rgb8(100, 200);
+        assert_eq!(super::fitted((200, 200), &img), (50, 0, 100, 200));
+        assert_eq!(super::fitted((100, 400), &img), (0, 100, 100, 200));
     }
 }

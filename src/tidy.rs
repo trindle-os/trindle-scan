@@ -192,8 +192,8 @@ pub fn tilt_of(img: &DynamicImage) -> Option<f32> {
 pub fn straighten(img: &DynamicImage) -> DynamicImage {
     match tilt_of(img) {
         Some(deg) if deg.abs() >= 0.4 => {
-            let fill = paper_level(&img.to_rgb8());
             let rgb = img.to_rgb8();
+            let fill = paper_level(&rgb);
             DynamicImage::ImageRgb8(rotated(&rgb, deg, Rgb([fill, fill, fill])))
         }
         _ => img.clone(),

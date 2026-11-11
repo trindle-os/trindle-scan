@@ -3,7 +3,6 @@
 use super::*;
 
 impl Scan {
-
     pub(super) fn follow_profile(&mut self) {
         let Some(p) = self.book.now().cloned() else { return };
         if p.scanner.is_empty() && p.host.is_empty() {
@@ -71,6 +70,26 @@ impl Scan {
         self.persist();
     }
 
+    fn use_preset(&mut self, i: usize) {
+        let mut p = Profile::presets().remove(i);
+        p.name = self.book.unique(&p.name);
+        p.folder = self.settings.folder.clone();
+        p.pattern = self.settings.pattern.clone();
+        if let Some(s) = self.scanner() {
+            p.scanner = s.name.clone();
+            p.host = s.host.clone();
+            p.port = s.port;
+            p.root = s.root.clone();
+        }
+        self.book.add(p);
+        self.persist();
+        self.screen = Screen::Main;
+
+        if self.book.profiles.len() == 1 {
+            self.begin_scan();
+        }
+    }
+
     pub(super) fn update_profiles(&mut self, msg: Msg) {
         match msg {
             Msg::Profiles => self.screen = if self.book.profiles.is_empty() { Screen::Presets } else { Screen::Profiles },
@@ -81,30 +100,14 @@ impl Scan {
                 self.screen = Screen::Main;
             }
             Msg::NewProfile => self.screen = Screen::Presets,
-            Msg::Preset(i) => {
-                let mut p = Profile::presets().remove(i);
-                p.name = self.book.unique(&p.name);
-                p.folder = self.settings.folder.clone();
-                p.pattern = self.settings.pattern.clone();
-                if let Some(s) = self.scanner() {
-                    p.scanner = s.name.clone();
-                    p.host = s.host.clone();
-                    p.port = s.port;
-                    p.root = s.root.clone();
-                }
-                self.book.add(p);
-                self.persist();
-                self.screen = Screen::Main;
-
-                if self.book.profiles.len() == 1 {
-                    self.begin_scan();
-                }
-            }
+            Msg::Preset(i) => self.use_preset(i),
             Msg::EditProfile(i) => {
                 self.book.current = i;
                 self.persist();
                 self.name_error = None;
-                self.ocr_langs = ocr::Engine::find().map(|e| e.languages()).unwrap_or_default();
+
+                let post = self.post.clone();
+                std::thread::spawn(move || post.send(Event::Languages(ocr::Engine::find().map(|e| e.languages()).unwrap_or_default())));
                 self.screen = Screen::Editor(i);
             }
             Msg::DuplicateProfile(i) => {
