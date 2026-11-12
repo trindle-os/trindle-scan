@@ -194,6 +194,6 @@ mod tests {
         assert_eq!(s.size_words(Size::A4), "A4, 210 by 297 mm");
         s.units = Units::Inches;
         assert_eq!(s.size_words(Size::Letter), "Letter, 8.5 by 11.0 in");
-        assert_eq!(s.size_words(Size::Largest), "Largest the scanner can do");
+        assert_eq!(s.size_words(Size::Largest), "Largest supported size");
     }
 }

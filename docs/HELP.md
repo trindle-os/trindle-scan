@@ -28,8 +28,8 @@ The first time you press Scan with no profile, it asks you to make a profile fir
 - **The bar** at the top has the Scan button, the Save button, and buttons for rotate left, rotate right, flip, look at a page, undo, redo and delete.
 - **The page list** shows a thumbnail of every page, numbered. A page that has been saved is marked "saved" in its caption.
 - **The note under the bar** says what just happened, such as "Scanned 3 pages" or where a file was saved. Problems show there in red words.
-- **The status line** shows the number of pages, how many are selected, and the state of the scanner ("Looking for scanners", "Asking ...", "... is ready", "Scanning page 2").
-- **Settings** and **Shortcuts** buttons open their own screens. **Add pictures** adds picture files to the list. A **Thumbnails** slider changes the size of the thumbnails. **Open folder** appears after a save and opens the folder the file went into. **Clear saved** appears once some pages are saved and takes them out of the list.
+- **The status line** shows the number of pages, how many are selected, and the state of the scanner ("Looking for scanners", "Contacting ...", "... is ready", "Scanning page 2").
+- **Settings** and **Shortcuts** buttons open their own screens. **Add pictures** adds picture files to the list. A **Thumbnails** slider changes the size of the thumbnails. **Open folder** appears after a save and opens the folder the file went into. **Clear saved pages** appears once some pages are saved and takes them out of the list.
 
 ### Selecting pages
 
@@ -56,7 +56,7 @@ Press **Choose a scanner** (or the scanner's name) to see the list. Each entry s
 
 - **Search again** looks again.
 - **Choose another scanner** goes back to the list.
-- **Enter an address by hand** is for a scanner on another network segment, which is not found by itself. Type its address, for example 192.168.1.40, with a port after a colon if it is not 80, then press Add. The program asks the scanner what it can do before it keeps it. The address must be on your own local network: the program refuses anything else.
+- The **Scanner address** box is for a scanner on another network segment, which is not found by itself. Type its address, for example 192.168.1.40, with a port after a colon if it is not 80, then press Add. The program asks the scanner what it can do before it keeps it. The address must be on your own local network: the program won't use any other address.
 - When you choose a scanner, the current profile remembers it. Next time, the program looks for that scanner again by name, and by address if the name has gone.
 
 A scanner plugged into USB after the program opened is found when the program is opened again.
@@ -69,7 +69,7 @@ A profile is a named set of scan settings. Press **New** to make one. You can st
 - **Document, colour:** A4, 300 dots per inch, colour, PDF.
 - **Photo:** the largest size the scanner can do, 600 dots per inch, colour, JPEG.
 
-The profile list lets you **Edit**, **Move up**, **Move down**, **Duplicate** (the copy is named "... copy"), **Make default** and **Delete this profile**. The first profile you make is the default. The big Scan button uses the current profile. A profile needs a name, and no two profiles may share a name.
+The profile list lets you **Edit**, **Move up**, **Move down**, **Duplicate** (the copy is named "... copy"), **Make default** and **Delete this profile**. The first profile you make is the default. The big Scan button uses the current profile. Every profile needs a name, and two profiles can't have the same name.
 
 ### Test scan
 
@@ -86,23 +86,23 @@ The program only offers choices that your scanner says it can do. If you choose 
 | Page size | A4, A5, A3, Letter, Legal, or the largest the scanner can do. If the size is bigger than the scanner can manage, the largest is used. If the scanner does not say how big its glass is, A4 is assumed. |
 | Resolution | Dots per inch, from 75 to 1200 as far as the scanner offers. Higher gives bigger files and slower scans. |
 | Colour | Colour, Grey, or Black and white. |
-| How dark counts as black | Only for Black and white. A number from 0 to 100, 50 to start. |
+| Black and white threshold | Only for Black and white. A number from 0 to 100, 50 to start. |
 | Brightness and contrast | From -100 to 100, 0 to start. Reset brightness and contrast puts both back to 0. |
-| Turn every page | No, or a fixed turn of 90, 180 or 270 degrees. |
+| Rotate every page | None, or a fixed turn of 90, 180 or 270 degrees. |
 | Straighten pages | Levels pages that came in slightly crooked. |
-| Trim borders and extra margin | Removes dark scanner borders, then trims the empty margin and leaves a small even one. |
+| Trim borders and margins | Removes dark scanner borders, then trims the empty margin and leaves a small even one. |
 | Skip blank pages | A page with almost no marks is left out as it arrives. The only page of a scan is never skipped. |
-| Ask for another page after each scan | Glass only. After each page, asks "Another page?" so you can put the next one down. |
-| Batch | One scan; Several runs; Until I stop. |
-| Number of runs | For Several runs: 2, 3, 4, 5, 10 or 20. |
-| Pause between runs | Wait for me, or 5, 10, 30, 60 or 120 seconds. While the pause counts down you can press Skip pause, or Stop to end the batch. With "Wait for me" you press Continue when the next stack is in. |
-| All runs in one file | Keeps the pages of all the runs together when saving automatically. Off means each run is saved on its own. |
+| Ask for another page after each scan | Glass only. After each page, asks "Scan another page?" so you can put the next one down. |
+| Batch | One scan; Several scans; Until I stop. |
+| Number of scans | For Several scans: 2, 3, 4, 5, 10 or 20. |
+| Pause between scans | Wait for me, or 5, 10, 30, 60 or 120 seconds. While the pause counts down you can press Skip pause, or Stop to end the batch. With "Wait for me" you press Continue when the next stack is in. |
+| All scans in one file | Keeps the pages of all the scans together when saving automatically. Off means each scan is saved on its own. |
 | Save automatically | Saves into the folder below as soon as a scan finishes. It does nothing until a folder is chosen. |
 | Make text searchable | PDFs get invisible text so you can search and select it. See "Searchable PDFs" below. |
 | Folder | Where automatic saves go. |
 | File type | PDF, JPEG, PNG or TIFF. This is also the type used when you press Save yourself. |
 | File name | The naming pattern. See below. |
-| Clear the pages from the list afterwards | After an automatic save, removes those pages from the list. Off means they stay, marked saved. |
+| Clear pages from the list after saving | After an automatic save, removes those pages from the list. Off means they stay, marked saved. |
 
 Changes to a profile are saved as you make them.
 
@@ -122,11 +122,11 @@ Characters that cannot go in a file name (such as a colon or a question mark) ar
 2. Press **Scan**, or press 1 to 9 on the keyboard to scan with the first to ninth profile.
 3. Pages appear in the list as they arrive. Press **Cancel** to stop a scan; pages that had already arrived are kept.
 
-On glass you are asked "Another page?" after each page unless you turned that off; press **Scan next** to carry on or **Finish** to stop.
+On glass you are asked "Scan another page?" after each page unless you turned that off; press **Scan next** to carry on or **Finish** to stop.
 
 For **Feeder, turn the stack over** the program scans the fronts, tells you to turn the stack over and press Scan for the back sides, then puts the pages in order.
 
-For batches the note shows "Run 1 done." and the pause counts down. When the batch is over the note gives a summary such as "Batch finished: 3 runs, 12 pages."
+For batches the note shows "Scan 1 is finished." and the pause counts down. When the batch is over the note gives a summary such as "Batch finished: 3 scans, 12 pages."
 
 ### Searchable PDFs
 
@@ -145,11 +145,11 @@ Where a file chooser from the desktop is not available, such as inside the plugi
 
 The save window opens in the folder you last saved to, or else the folder set in Settings. After a save the note says where the file went, and **Open folder** opens that folder.
 
-Saved pages are marked "saved". If you turn on "Take saved pages out of the list after saving" in Settings, they leave the list at once. If a save fails the pages stay in the list and the note tells you why.
+Saved pages are marked "saved". If you turn on "Remove pages from the list once saved" in Settings, they leave the list at once. If a save fails the pages stay in the list and the note tells you why.
 
 ### Add pictures
 
-**Add pictures** lets you choose JPEG, PNG or TIFF files to add to the page list, where you can tidy them and save them like scanned pages. You can also drop picture files onto the window. Files that cannot be read are counted in the note ("One file could not be read."). Dropping text or anything that is not a picture is refused.
+**Add pictures** lets you choose JPEG, PNG or TIFF files to add to the page list, where you can tidy them and save them like scanned pages. You can also drop picture files onto the window. Files that cannot be read are counted in the note ("Trindle Scan couldn't read one file."). Text and anything else that is not a picture can't be dropped.
 
 ## Settings
 
@@ -157,16 +157,16 @@ Open **Settings** from the main window. Everything saves as you change it. There
 
 | Setting | Default | What it does |
 |---|---|---|
-| Folder new profiles save into | none | Copied into each profile you make as its automatic save folder. It is also where the save window opens before you have saved anything. |
-| File name new profiles start with | Scan, then the date and time | Copied into each new profile as its naming pattern. |
+| Default folder for new profiles | none | Copied into each profile you make as its automatic save folder. It is also where the save window opens before you have saved anything. |
+| Default file name for new profiles | Scan, then the date and time | Copied into each new profile as its naming pattern. |
 | Thumbnail size | 150 pixels wide | A slider from 90 to 300. |
 | Units for page sizes | Millimetres | Millimetres or inches, wherever page sizes are shown. |
-| Take saved pages out of the list after saving | off | Removes pages from the list once they are saved. |
+| Remove pages from the list once saved | off | Removes pages from the list once they are saved. |
 | PDF title | "Scan" if empty | Written into saved PDF files. |
 | PDF author, subject, keywords | empty | Written into saved PDF files. |
 | Pages in each PDF file | All | All, or 2, 5, 10, 20 or 50. A long scan then becomes several files named "... part 1", "... part 2" and so on. |
 | Password to open the PDF | none | The PDF is locked with AES-256 and asks for this password to open. It is kept in the settings file as plain text, so use it only for casual privacy. |
-| Folder to keep pages in while the program is open | the user's runtime folder, else the system temporary folder | Where each page is copied as it arrives, so a crash does not lose it. A change is used the next time the program starts. |
+| Temporary pages folder | the user's runtime folder, else the system temporary folder | Where each page is copied as it arrives, so a crash does not lose it. A change is used the next time the program starts. |
 
 Changing a setting here does not change profiles you have already made.
 
@@ -176,14 +176,14 @@ The keys for scanning and editing work on the main window.
 
 | Keys | What they do |
 |---|---|
-| 1 to 9 | Scan with the first to ninth profile |
+| 1 to 9 | Scan with the profile at that position in the list |
 | Ctrl+A | Select every page |
 | Delete | Delete the selected pages |
 | Ctrl+Z | Undo |
 | Ctrl+Shift+Z | Redo |
 | Alt+Left, Alt+Right | Move the selected pages earlier or later |
 | Tab and Shift+Tab | Move between buttons and pages |
-| Space or Enter | Press the button or choose the page that has the focus |
+| Space or Enter | Press the highlighted button or choose the highlighted page |
 | Plus, minus, 0 | In the large view: zoom in, zoom out, whole page |
 
 Every control has a name for screen readers, and scan results and problems are announced.
@@ -193,60 +193,63 @@ Every control has a name for screen readers, and scan results and problems are a
 Problems show as red words under the bar. Nothing ever pops up over the window.
 
 **"No scanner found. Check it is on the same network as this computer, or type its address below."**
-The scanner is off, asleep, or on another network. Switch it on, check that it is on the same network (Wi-Fi or cable) as this computer, and press Search again. If it still does not appear, use Enter an address by hand. Some printers need their network scanning (AirScan or eSCL) switched on in their own settings.
+The scanner is off, asleep, or on another network. Switch it on, check that it is on the same network (Wi-Fi or cable) as this computer, and press Search again. If it still does not appear, use the **Scanner address** box. Some printers need their network scanning (AirScan or eSCL) switched on in their own settings.
 
-**"The scanner did not answer."** followed by a detail
-The detail tells you more: it did not answer in time, it answered with an error code, it did not say what it can scan, or it refused the scan. Check the scanner is on and awake and press Try again. If it keeps happening, switch the scanner off and on.
+**"The scanner isn't responding."** followed by a detail
+The detail tells you more: it took too long to respond, or there is no scanner address. Check the scanner is on and awake and press Try again. If it keeps happening, switch the scanner off and on.
 
-**"The scanner is busy. Trying again, 55 seconds left."**
+**"The scanner had a problem."** followed by a detail
+The detail tells you more: the scanner replied with an error code, didn't report what it can scan, couldn't start the scan, didn't send the scan, sent a reply Trindle Scan couldn't read, or sent an address Trindle Scan can't safely use. Check the scanner is on and awake and press Try again. If it keeps happening, switch the scanner off and on.
+
+**"The scanner is busy. Trindle Scan will try again for another 55 seconds."**
 Another job (or another computer) is using the scanner. The program tries again every five seconds for up to a minute. Press Stop to give up. If it ends with "The scanner is still busy. Try again in a moment.", wait for the other job to finish and press Try again.
 
 **"Put paper in the feeder."**
-The feeder is empty. Load it and press Try again, or press **Use glass instead** to scan from the glass this time.
+The feeder is empty. Load it and press Try again, or press **Use the glass instead** to scan from the glass this time.
 
-**"Paper jam."**
+**"The paper has jammed."**
 Clear the jam on the scanner, then press Try again.
 
 **"That address is not on your local network."**
-The program only talks to scanners at addresses on your own network. A public address, or a name that points outside your network, is refused on purpose.
+The program only talks to scanners at addresses on your own network. A public address, or a name that points outside your network, is not used, on purpose.
 
-**"The scanner would not accept its ... setting, so nothing was scanned."**
+**"The scanner didn't accept the ... setting, so nothing was scanned."**
 The scanner turned down one of the profile's settings. Open the profile and try another source, size or resolution, or use Test scan.
 
 **"The scanner cover is open. Close it and try again."**
 Close the lid or cover on the scanner.
 
-**"Check the scanner is plugged in and switched on."** (USB)
-Check the cable and the power. A USB scanner plugged in after the program opened is found when the program is opened again.
+**"Trindle Scan can't reach the scanner."** (USB)
+Check the cable and the power. A USB scanner plugged in after Trindle Scan opened is found when Trindle Scan is opened again.
 
-**"This program is not allowed to use the USB scanner."**
-Allow Use scanners and USB devices for Trindle Scan in its permissions, then open it again.
+**"Trindle Scan isn't allowed to use USB scanners."**
+Switch on Use scanners and USB devices in its permissions, then open it again.
 
-**"USB scanners need scanner software (SANE) that is not on this computer."**
+**"USB scanners need the SANE scanner software, which isn't installed on this computer."**
 The computer has no SANE scanner software. Network scanners still work.
 
-**"The scanner sent the picture in a form this program cannot read."**
+**"The scanner sent the picture in a form Trindle Scan can't read."**
 This scanner sends pictures in a way Trindle Scan does not support. Try the scanner's network (AirScan) mode if it has one.
 
-**"One page came back damaged and was skipped."**
+**"One page was damaged, so Trindle Scan skipped it."**
 That page arrived broken. Scan it again.
 
-**"Could not save: ... The pages are still here."**
-The folder may be full, read-only or gone. Nothing was lost: choose another folder and press Save again. Automatic saves give the same advice ("Could not save automatically").
+**"Trindle Scan couldn't save your scans: ... Your pages are still here."**
+The folder may be full, read-only or gone. Nothing was lost: choose another folder and press Save again. Automatic saves give the same advice ("Trindle Scan couldn't save your scans automatically").
 
-**"Something went wrong inside the program and the job was stopped. Your pages are still here."**
+**"Something went wrong, so Trindle Scan stopped. Your pages are still here."**
 The program stopped a job that failed. Your pages stay in the list; save them, then try again. If it keeps happening, tell us (see below).
 
 **"N pages were left from last time."**
-The program closed without saving, for example in a crash. Pages are kept in a private recovery folder. Press **Recover them** to put them back in the list, or **Discard them** to throw them away.
+The program closed without saving, for example in a crash. Pages are kept in a private recovery folder. Press **Recover pages** to put them back in the list, or **Discard pages** to throw them away.
 
-**"Could not keep your settings" or "Could not keep your profiles"**
+**"Trindle Scan couldn't save your settings" or "Trindle Scan couldn't save your profiles"**
 The settings folder (under ~/.config/trindle-scan) cannot be written. Check the disk is not full or read-only.
 
-**"Your home folder is not set, so your settings and profiles cannot be kept this time."**
+**"Trindle Scan can't find your home folder, so it can't save your settings and profiles this time."**
 The computer did not give the program a home folder. The program works, but nothing is saved between runs.
 
-**"Reading text needs the Tesseract program, which is not on this computer."**
+**"To read text, Trindle Scan needs Tesseract, which isn't installed on this computer."**
 The plugin was built without text reading. Pages are saved without searchable text.
 
 **"The text on page 3 could not be read. That page is saved without searchable text."**
@@ -257,7 +260,7 @@ You are asked "Close without saving?" with "One page is not saved" or "N pages a
 
 ### Scanner notes
 
-- The Epson ET-2710 on a USB cable appears in the list as "Epson L3150 Series", which is the name the Linux scanner software gives it. It stops answering if it is spoken to in the seconds after a scan, so the program leaves a USB scanner alone for five seconds after each scan. In one test, four scans in a row worked. Longer use on this printer is not proved.
+- The Epson ET-2710 on a USB cable appears in the list as "Epson L3150 Series", which is the name the Linux scanner software gives it. It stops responding if it is contacted in the seconds after a scan, so the program leaves a USB scanner alone for five seconds after each scan. In one test, four scans in a row worked. Longer use on this printer is not proved.
 - A better route for that printer is `ipp-usb`, which shares it as a driverless network scanner. Trindle Scan lists such a scanner, but this route has not been tried with that printer.
 - No network scanner has been tested on real hardware yet. The program is tested against a simulated scanner.
 - If your scanner does not appear, send a bug report with its make and model.

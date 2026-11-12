@@ -25,7 +25,7 @@ Install Trindle Scan from Apps in Trindle. It asks for three things: your home n
 
 Scanners are searched for only after you open the program, and only on your own network. Press Scan. If you have no profile yet, you are asked to make one first, and the scan starts as soon as it is saved.
 
-If your scanner is on another network segment and is not found, use **Enter an address by hand** in the scanner list.
+If your scanner is on another network segment and is not found, type its address in the **Scanner address** box in the scanner list.
 
 ## Profiles and the scanner
 
@@ -66,7 +66,7 @@ Tested with real hardware: none of the network scanners yet; the Epson ET-2710 o
 
 The Epson ET-2710 on USB shows up in the list as "Epson L3150 Series", which is the name the Linux scanner software gives it.
 
-- On 26 October 2026 it did one or two scans in a row and then stopped answering until it was switched off and on. The cause looked like the printer being spoken to in the seconds after a scan, so the program now leaves a USB scanner alone for five seconds after each scan.
+- On 26 October 2026 it did one or two scans in a row and then stopped responding until it was switched off and on. The cause looked like the printer being contacted in the seconds after a scan, so the program now leaves a USB scanner alone for five seconds after each scan.
 - On 27 October 2026, after the printer was switched off and on, four scans in a row all worked and the printer was still listed afterwards. That is one run, so longer use on this printer is not yet proved.
 - The better route for this printer is `ipp-usb`, which shares it as a driverless network scanner. The program lists such a scanner, but that route has not been tried with this printer.
 
@@ -78,14 +78,14 @@ Settings are changed in the program's own Settings screen and saved as you chang
 
 | Setting | Required | Default | What it does |
 |---|---|---|---|
-| Folder new profiles save into | no | none | Where a new profile's auto-save goes. |
-| File name new profiles start with | no | a built-in pattern | The naming pattern a new profile starts with. |
-| Folder to keep pages in while the program is open | no | `$XDG_RUNTIME_DIR`, else the system temporary folder | Where pages are copied as they are scanned (see below). Used the next time the program starts. |
+| Default folder for new profiles | no | none | Where a new profile's auto-save goes. |
+| Default file name for new profiles | no | a built-in pattern | The naming pattern a new profile starts with. |
+| Temporary pages folder | no | `$XDG_RUNTIME_DIR`, else the system temporary folder | Where pages are copied as they are scanned (see below). Used the next time the program starts. |
 | Units for page sizes | no | millimetres | Millimetres or inches. |
-| Remove saved pages after saving | no | off | Takes saved pages out of the list. |
+| Remove pages from the list once saved | no | off | Takes saved pages out of the list. |
 | PDF title, author, subject, keywords | no | empty | Written into saved PDF files. |
 | Pages in each PDF file | no | all | Splits a long scan into several files. |
-| Password to open the PDF | no | none | Kept as plain text in the settings file, so for casual privacy only. |
+| Password to open the PDF | no | none | Stored as plain text in the settings file, so for casual privacy only. |
 | Thumbnail size | no | 150 pixels wide | Slider in the page list. |
 
 ## Where your data lives
@@ -108,7 +108,6 @@ cargo build --release
 The plugin does not carry libxkbcommon, libwayland-client or libffi; Trindle installs them, and the build script stops if the program needs any other library.
 
 To make the plugin archive, run `packaging/build-trindle-plugin.sh <output folder>`; the script fetches the toolkit from GitHub as the build above does, or set `TOOLKIT_ROOT` to a local checkout of the toolkit to build against that instead. The program is built into `target/shipped` with the build computer's folder names removed from it. Set `TESSERACT_ROOT` to a folder holding Tesseract and its language data to carry searchable-PDF support in the plugin.
-
 
 ## Licence
 

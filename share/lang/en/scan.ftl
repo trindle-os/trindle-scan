@@ -6,19 +6,19 @@
 scan-app-name = Trindle Scan
 
 # Red words at start-up when the home folder is not set to a full path, so settings and profiles cannot be kept.
-scan-main-error-no-home = Your home folder is not set, so your settings and profiles cannot be kept this time.
+scan-main-error-no-home = Trindle Scan can't find your home folder, so it can't save your settings and profiles this time.
 
 # Red words when the program's own settings could not be saved. The reason from the computer follows.
-scan-main-error-keep-settings = Could not keep your settings: { $why }
+scan-main-error-keep-settings = Trindle Scan couldn't save your settings: { $why }
 
 # Red words when the profiles could not be saved. The reason from the computer follows.
-scan-main-error-keep-profiles = Could not keep your profiles: { $why }
+scan-main-error-keep-profiles = Trindle Scan couldn't save your profiles: { $why }
 
 # Red words under the bar when Scan is pressed with no scanner chosen.
-scan-main-error-no-scanner = No scanner chosen yet.
+scan-main-error-no-scanner = You haven't chosen a scanner yet.
 
 # Red words when Scan is pressed before the scanner has said what it can do.
-scan-main-error-wait-caps = Waiting for the scanner to say what it can do.
+scan-main-error-wait-caps = Trindle Scan is still checking what the scanner can do. Try again in a moment.
 
 # Red words on the profile editor when Test scan is pressed with no scanner.
 scan-main-test-choose-scanner = Choose a scanner first, then try again.
@@ -27,7 +27,7 @@ scan-main-test-choose-scanner = Choose a scanner first, then try again.
 scan-main-test-failed = The test scan did not work: { $why }
 
 # Red words on the profile editor when the scanner sent no page for the test scan.
-scan-main-test-no-page = No page came from the scanner. Put a page in and try again.
+scan-main-test-no-page = The scanner didn't send a page. Put a page in and try again.
 
 # Spoken by the screen reader when the test scan has finished.
 scan-main-announce-test-done = Test scan finished
@@ -36,15 +36,15 @@ scan-main-announce-test-done = Test scan finished
 scan-main-announce-test-failed = Test scan did not work
 
 # Note under the bar when a page came back damaged and was left out.
-scan-main-note-damaged = One page came back damaged and was skipped.
-scan-save-page-unreadable = A scanned page could not be read, so nothing was saved.
-scan-save-page-encode = A page could not be turned into a picture: { $why }
+scan-main-note-damaged = One page was damaged, so Trindle Scan skipped it.
+scan-save-page-unreadable = Trindle Scan couldn't read a scanned page, so nothing was saved.
+scan-save-page-encode = Trindle Scan couldn't turn a page into a picture: { $why }
 
 # Red words when a scan stopped part way. The first part says what went wrong, then how many pages were kept.
 scan-main-error-with-kept =
     { $words } { $n ->
-        [one] { $n } page kept.
-       *[other] { $n } pages kept.
+        [one] The page that did arrive is still here.
+       *[other] The { $n } pages that did arrive are still here.
     }
 
 # Note after saving a long scan as several PDF files: the folder and file name, then how many files.
@@ -61,11 +61,11 @@ scan-main-note-saved = Saved to { $path }
 scan-main-note-saved-summary = { $summary } Saved to { $path }
 
 # Red words when pages could not be saved. The reason follows.
-scan-main-error-save = Could not save: { $why }. The pages are still here.
+scan-main-error-save = Trindle Scan couldn't save your scans: { $why }. Your pages are still here.
 
 # Red words when an automatic save did not work. The reason follows.
-scan-main-error-autosave = Could not save automatically: { $why }. The pages are still here.
-scan-main-error-crashed = Something went wrong inside the program and the job was stopped. Your pages are still here.
+scan-main-error-autosave = Trindle Scan couldn't save your scans automatically: { $why }. Your pages are still here.
+scan-main-error-crashed = Something went wrong, so Trindle Scan stopped. Your pages are still here.
 
 # Note under the bar after pictures were added from files.
 scan-main-note-added =
@@ -80,18 +80,18 @@ scan-main-note-added-failed =
         [one] { $n } picture
        *[other] { $n } pictures
     }. { $failed ->
-        [one] One file could not be read.
-       *[other] { $failed } files could not be read.
+        [one] Trindle Scan couldn't read one file.
+       *[other] Trindle Scan couldn't read { $failed } files.
     }
 
 # Red words when the folder of saved files could not be opened.
-scan-main-error-open-folder = The folder could not be opened.
+scan-main-error-open-folder = Trindle Scan couldn't open the folder.
 
 # Red words when pages could not be copied to the recovery folder, so a crash would lose them.
 scan-main-error-not-kept =
     { $n ->
-        [one] One page could not be copied to the recovery folder, so a crash would lose it.
-       *[other] { $n } pages could not be copied to the recovery folder, so a crash would lose them.
+        [one] Trindle Scan couldn't copy one page to the recovery folder. If Trindle Scan crashes, you'll lose it.
+       *[other] Trindle Scan couldn't copy { $n } pages to the recovery folder. If Trindle Scan crashes, you'll lose them.
     }
 
 # Note under the bar after pages from last time were brought back.
@@ -102,19 +102,19 @@ scan-main-note-recovered =
     } from last time.
 
 # Note when the front sides are done and the person must turn the stack over.
-scan-main-note-turn-over = Turn the stack over and press Scan for the back sides.
+scan-main-note-turn-over = Turn the stack over, then press Scan to scan the backs.
 
 # Note and question on the bar after a glass scan, asking whether to scan another page.
-scan-main-note-another-page = Another page?
+scan-main-note-another-page = Scan another page?
 
 # Note under the bar when one run of a batch has finished.
-scan-main-note-run-done = Run { $n } done.
+scan-main-note-run-done = Scan { $n } is finished.
 
 # Summary when a batch has finished: how many runs and how many pages.
 scan-main-summary-batch =
     Batch finished: { $runs ->
-        [one] { $runs } run
-       *[other] { $runs } runs
+        [one] { $runs } scan
+       *[other] { $runs } scans
     }, { $pages ->
         [one] { $pages } page
        *[other] { $pages } pages
@@ -125,10 +125,10 @@ scan-main-error-busy-still = The scanner is still busy. Try again in a moment.
 
 # Red words while the program waits for a busy scanner, counting down.
 scan-main-error-busy-retry =
-    The scanner is busy. Trying again, { $n ->
+    The scanner is busy. Trindle Scan will try again for another { $n ->
         [one] { $n } second
        *[other] { $n } seconds
-    } left.
+    }.
 
 # Note under the bar when a scan has finished.
 scan-main-note-scanned =
@@ -142,16 +142,16 @@ scan-main-note-scanned-skipped =
     Scanned { $n ->
         [one] { $n } page
        *[other] { $n } pages
-    }, { $blanks ->
+    } and skipped { $blanks ->
         [one] { $blanks } blank page
        *[other] { $blanks } blank pages
-    } skipped
+    }
 
 # File name for one part of a PDF that was split into several files.
 scan-main-part-name = { $stem } part { $n }
 
 # Red words when retrying was stopped because the scanner was busy.
-scan-main-error-stopped-busy = Stopped. The scanner was busy.
+scan-main-error-stopped-busy = Scanning stopped because the scanner was busy.
 
 # Words while an address typed by hand is being checked.
 scan-main-note-checking-address = Checking the address
@@ -160,10 +160,10 @@ scan-main-note-checking-address = Checking the address
 scan-main-filter-pictures = Pictures
 
 # Red words when something dropped on the window gave no files. The reason follows.
-scan-main-drop-nothing = Nothing was added: { $why }
+scan-main-drop-nothing = Trindle Scan couldn't add the files: { $why }
 
 # Red words when text, not a file, is dropped on the window.
-scan-main-drop-text = Only picture files can be dropped here.
+scan-main-drop-text = You can only drop picture files here.
 
 ## Status line (src/main.rs)
 
@@ -191,7 +191,7 @@ scan-status-searching = Looking for scanners
 scan-status-ready = { $name } is ready
 
 # Status line while the chosen scanner is being asked what it can do.
-scan-status-asking = Asking { $name }
+scan-status-asking = Contacting { $name }
 
 # Status line when no scanner is chosen.
 scan-status-none = No scanner chosen
@@ -200,13 +200,13 @@ scan-status-none = No scanner chosen
 scan-status-line = { $pages }      { $state }
 
 # Red words under the profile name box when it is empty.
-scan-profiles-error-name-empty = A profile needs a name.
+scan-profiles-error-name-empty = Give the profile a name.
 
 # Red words under the profile name box when another profile has that name.
 scan-profiles-error-name-taken = Another profile already has that name.
 
 # Red words when a page cannot be opened in the large view.
-scan-view-error-unshown = That page could not be shown.
+scan-view-error-unshown = Trindle Scan can't show that page.
 
 ## Large view of one page (src/main.rs)
 
@@ -217,7 +217,7 @@ scan-view-page-of = Page { $i } of { $n }
 scan-view-crop-heading = Crop
 
 # Note under the crop heading.
-scan-view-crop-note = Cut margins as a share of the page. It applies to every selected page.
+scan-view-crop-note = Set how much to cut off each edge. This changes every selected page.
 
 # Label of the crop slider for the left edge.
 scan-view-crop-left = Left
@@ -277,7 +277,7 @@ scan-common-choose = Choose
 scan-common-use = Use
 
 # Note that changes are kept as they are made.
-scan-common-changes-save = Changes save as you make them.
+scan-common-changes-save = Your changes are saved as you go.
 
 ## Bar above the pages (src/main.rs)
 
@@ -286,7 +286,7 @@ scan-bar-pause-empty = Put in the next stack, then press Continue.
 
 # Words on the bar counting down to the next batch run.
 scan-bar-pause-wait =
-    Next run in { $n ->
+    Next scan in { $n ->
         [one] { $n } second
        *[other] { $n } seconds
     }
@@ -325,7 +325,7 @@ scan-bar-rotate-right = Rotate right
 scan-bar-flip = Flip
 
 # Tip and spoken name of the button that opens the large view.
-scan-bar-look = Look at the first selected page
+scan-bar-look = View first selected page
 
 # Tip and spoken name of the undo button.
 scan-bar-undo = Undo
@@ -340,7 +340,7 @@ scan-bar-delete = Delete selected pages
 scan-bar-try-again = Try again
 
 # Button that scans from the glass when the feeder failed.
-scan-bar-use-glass = Use glass instead
+scan-bar-use-glass = Use the glass instead
 
 # Button that searches the network for scanners again.
 scan-bar-search-again = Search again
@@ -373,10 +373,10 @@ scan-pages-recover-left =
     }
 
 # Button that brings back the pages left from the last run.
-scan-pages-recover = Recover them
+scan-pages-recover = Recover pages
 
 # Button that throws away the pages left from the last run.
-scan-pages-discard = Discard them
+scan-pages-discard = Discard pages
 
 # Label of the thumbnail size slider on the bottom bar.
 scan-pages-thumbnails = Thumbnails
@@ -397,7 +397,7 @@ scan-pages-add-pictures = Add pictures
 scan-pages-open-folder = Open folder
 
 # Bottom bar button that removes saved pages from the list.
-scan-pages-clear-saved = Clear saved
+scan-pages-clear-saved = Clear saved pages
 
 ## Folder and picture picker (src/main.rs, src/browse.rs)
 
@@ -405,7 +405,7 @@ scan-pages-clear-saved = Clear saved
 scan-browse-title-save-pdf = Save scan
 
 # Title of the picker for choosing where pictures are saved.
-scan-browse-title-save-folder = Choose a folder to save the pictures in
+scan-browse-title-save-folder = Folder for the pictures
 
 # Title of the picker (and of the system file chooser) for adding pictures.
 scan-browse-title-pictures = Add pictures
@@ -414,10 +414,10 @@ scan-browse-title-pictures = Add pictures
 scan-browse-title-profile-folder = Folder to save scans in
 
 # Title of the picker for the folder new profiles save into.
-scan-browse-title-settings-folder = Folder new profiles save into
+scan-browse-title-settings-folder = Default folder for new profiles
 
 # Title of the picker for the folder pages are kept in while the program is open.
-scan-browse-title-temp-folder = Folder to keep pages in while the program is open
+scan-browse-title-temp-folder = Temporary pages folder
 
 # File name that scans start with, without the ending.
 scan-browse-default-name = Scan
@@ -426,19 +426,19 @@ scan-browse-default-name = Scan
 scan-browse-error-open-first-new = Open one of your folders first, then make the new folder inside it.
 
 # Red words in the picker when a new folder name is not plain.
-scan-browse-error-folder-name = Give the folder a plain name, with no slashes and not starting with a dot.
+scan-browse-error-folder-name = Folder names can't contain slashes or start with a dot.
 
 # Red words in the picker when a folder could not be made. The reason follows.
-scan-browse-error-make-folder = Could not make the folder: { $why }
+scan-browse-error-make-folder = Trindle Scan couldn't create the folder: { $why }
 
 # Red words in the picker when Add is pressed with no pictures chosen.
-scan-browse-error-no-pictures = Press the pictures you want, then add them.
+scan-browse-error-no-pictures = Select the pictures you want, then add them.
 
 # Red words in the picker when Save is pressed before a folder is open.
 scan-browse-error-open-first = Open one of your folders first.
 
 # Red words in the picker when the file name is not plain.
-scan-browse-error-file-name = Give the file a plain name, with no slashes and not starting with a dot.
+scan-browse-error-file-name = File names can't contain slashes or start with a dot.
 
 # Red words in the picker when a file with that name already exists.
 scan-browse-error-name-taken = A file with that name is already there. Choose another name.
@@ -453,7 +453,7 @@ scan-browse-up = Up
 scan-browse-kind-folder = Folder
 
 # Detail under a picture that has been chosen in the picker.
-scan-browse-kind-chosen = Chosen
+scan-browse-kind-chosen = Selected
 
 # Detail under a picture in the picker.
 scan-browse-kind-picture = Picture
@@ -465,7 +465,7 @@ scan-browse-empty-pictures = No folders or pictures here.
 scan-browse-empty-folders = No folders here yet.
 
 # Label above the new folder box in the picker.
-scan-browse-new-folder = New folder here
+scan-browse-new-folder = New folder
 
 # Spoken name of the new folder box in the picker.
 scan-browse-new-folder-spoken = Name of the new folder
@@ -498,7 +498,7 @@ scan-shortcuts-title = Keyboard shortcuts
 scan-shortcuts-profile-keys = 1 to 9
 
 # What the profile keys do.
-scan-shortcuts-profile-what = Scan with the first to ninth profile
+scan-shortcuts-profile-what = Scan with the profile at that position in the list
 
 # Keys that select every page.
 scan-shortcuts-select-keys = Ctrl+A
@@ -546,10 +546,10 @@ scan-shortcuts-tab-what = Move between buttons and pages
 scan-shortcuts-press-keys = Space or Enter
 
 # What the space and enter keys do.
-scan-shortcuts-press-what = Press the button or choose the page that has the focus
+scan-shortcuts-press-what = Press the highlighted button or choose the highlighted page
 
 # Note under the list of shortcuts.
-scan-shortcuts-note = The keys that scan and edit pages work on the page list screen.
+scan-shortcuts-note = The keys for scanning and editing pages work on the page list screen.
 
 ## Settings screen (src/main.rs, src/settings.rs)
 
@@ -557,13 +557,13 @@ scan-shortcuts-note = The keys that scan and edit pages work on the page list sc
 scan-settings-title = Settings
 
 # Label above the folder new profiles save into.
-scan-settings-folder = Folder new profiles save into
+scan-settings-folder = Default folder for new profiles
 
 # Words when no folder has been chosen.
 scan-settings-no-folder = No folder chosen
 
 # Label above the default file name box.
-scan-settings-pattern = File name new profiles start with
+scan-settings-pattern = Default file name for new profiles
 
 # Spoken name of the default file name box.
 scan-settings-pattern-spoken = Default file name pattern
@@ -588,13 +588,13 @@ scan-settings-units-mm = Millimetres
 scan-settings-units-in = Inches
 
 # Note showing a page size written in the chosen units.
-scan-settings-example = For example { $size }
+scan-settings-example = For example, { $size }
 
 # Label of the switch that takes saved pages out of the list.
-scan-settings-remove-saved = Take saved pages out of the list after saving
+scan-settings-remove-saved = Remove pages from the list once saved
 
 # Spoken name of the remove saved pages switch.
-scan-settings-remove-saved-spoken = Remove saved pages after saving
+scan-settings-remove-saved-spoken = Remove pages after saving
 
 # Heading above the PDF details.
 scan-settings-pdf-heading = Saved PDF files
@@ -639,22 +639,22 @@ scan-settings-pdf-password = Password to open the PDF
 scan-settings-pdf-password-spoken = PDF password
 
 # Note under the PDF password box.
-scan-settings-pdf-password-note = Leave it empty for no password. It is kept in your settings file as plain text, so use a password only for casual privacy.
+scan-settings-pdf-password-note = Leave this empty for no password. Anyone who can open your settings file can read the password, because it is stored as plain text.
 
 # Title written in a saved PDF when the person has not typed one.
 scan-settings-pdf-default-title = Scan
 
 # Heading above the place pages are kept while open.
-scan-settings-progress-heading = Pages in progress
+scan-settings-progress-heading = Temporary pages
 
 # Label above the folder pages are kept in while the program is open.
-scan-settings-temp = Folder to keep pages in while the program is open
+scan-settings-temp = Temporary pages folder
 
 # Words when the default place is used to keep pages.
-scan-settings-temp-default = The default place
+scan-settings-temp-default = Default folder
 
 # Note under the folder for pages in progress.
-scan-settings-temp-note = This one is used the next time the program starts.
+scan-settings-temp-note = This change takes effect the next time you open Trindle Scan.
 
 # A page size with its measurements in millimetres.
 scan-settings-size-mm = { $name }, { $w } by { $h } mm
@@ -668,7 +668,7 @@ scan-settings-size-in = { $name }, { $w } by { $h } in
 scan-scanners-none = No scanner found. Check it is on the same network as this computer, or type its address below.
 
 # Label above the box for a scanner address.
-scan-scanners-address = Enter an address by hand
+scan-scanners-address = Scanner address
 
 # Spoken name of the scanner address box.
 scan-scanners-address-spoken = Scanner address, for example 192.168.1.40
@@ -677,7 +677,7 @@ scan-scanners-address-spoken = Scanner address, for example 192.168.1.40
 scan-scanners-add = Add
 
 # Note under the scanner address box.
-scan-scanners-address-note = A scanner on another network is not found by itself. Its address gets round that.
+scan-scanners-address-note = Trindle Scan can't find a scanner on another network by itself. Type its address to add it.
 
 ## Profiles (src/main.rs, src/profile.rs)
 
@@ -685,7 +685,7 @@ scan-scanners-address-note = A scanner on another network is not found by itself
 scan-presets-title = Make a profile
 
 # Note on the screen for making a profile.
-scan-presets-note = A profile keeps your scan settings. Pick one to start from; you can change it later.
+scan-presets-note = A profile stores your scan settings. Choose one to start with. You can change it later.
 
 # Title of the profiles screen.
 scan-profiles-title = Profiles
@@ -751,7 +751,7 @@ scan-profile-size-letter = Letter
 scan-profile-size-legal = Legal
 
 # Page size choice: the biggest the scanner can do.
-scan-profile-size-largest = Largest the scanner can do
+scan-profile-size-largest = Largest supported size
 
 # File type PDF.
 scan-profile-format-pdf = PDF
@@ -766,19 +766,19 @@ scan-profile-format-png = PNG
 scan-profile-format-tiff = TIFF
 
 # Note when the scanner did not say how big its glass is.
-scan-profile-told-glass = The scanner did not say how big its glass is, so A4 is assumed.
+scan-profile-told-glass = The scanner didn't report its glass size, so Trindle Scan used A4.
 
 # Note when the page size was cut down to what the scanner can do.
-scan-profile-told-size = The page size was larger than the scanner can do, so the largest was used.
+scan-profile-told-size = The page size was too big for the scanner, so Trindle Scan used its largest supported size.
 
 # Note when the resolution was changed to one the scanner offers.
-scan-profile-told-dpi = { $dpi } dots per inch is not offered, so { $near } was used.
+scan-profile-told-dpi = The scanner can't do { $dpi } dots per inch, so Trindle Scan used { $near }.
 
 # Note when the scanner has no feeder and the glass was used.
-scan-profile-told-feeder = The scanner has no feeder, so the glass was used.
+scan-profile-told-feeder = The scanner has no feeder, so Trindle Scan used the glass.
 
 # Note when the scanner cannot scan both sides in one pass.
-scan-profile-told-duplex = The scanner cannot do both sides in one pass.
+scan-profile-told-duplex = The scanner can't scan both sides at once.
 
 ## Profile editor (src/main.rs)
 
@@ -798,7 +798,7 @@ scan-editor-test-heading = Test scan
 scan-editor-test-busy = Scanning a test page
 
 # Note beside the Test scan button.
-scan-editor-test-note = Scans one page with these settings. It is not added to your pages.
+scan-editor-test-note = This scans one page with these settings. It isn't added to your pages.
 
 # Note under the test page picture.
 scan-editor-test-size = Test page: { $w } by { $h } pixels
@@ -825,13 +825,13 @@ scan-editor-source-manual = Feeder, turn the stack over
 scan-editor-size = Page size
 
 # Label above the resolution choice.
-scan-editor-dpi = Resolution, dots per inch
+scan-editor-dpi = Resolution (dots per inch)
 
 # Spoken name of the resolution choice.
 scan-editor-dpi-spoken = Resolution
 
 # Note under the resolution choice when it is high.
-scan-editor-dpi-note = High resolution makes big files and slow scans.
+scan-editor-dpi-note = A higher resolution gives bigger files and slower scans.
 
 # Label above the colour choice.
 scan-editor-colour = Colour
@@ -849,7 +849,7 @@ scan-editor-colour-grey = Grey
 scan-editor-colour-bw = Black and white
 
 # Label above the black and white threshold slider.
-scan-editor-threshold = How dark counts as black: { $n }
+scan-editor-threshold = Black and white threshold: { $n }
 
 # Spoken name of the threshold slider.
 scan-editor-threshold-spoken = Black and white threshold
@@ -870,19 +870,19 @@ scan-editor-contrast-spoken = Contrast
 scan-editor-reset-tone = Reset brightness and contrast
 
 # Label above the choice of turning every page.
-scan-editor-rotate = Turn every page
+scan-editor-rotate = Rotate every page
 
 # Choice of turning: do not turn.
-scan-editor-rotate-none = No
+scan-editor-rotate-none = None
 
 # Spoken name of the turn choice.
-scan-editor-rotate-spoken = Fixed rotation in degrees
+scan-editor-rotate-spoken = Page rotation in degrees
 
 # Label and spoken name of the straighten switch.
 scan-editor-straighten = Straighten pages
 
 # Label of the trim borders switch.
-scan-editor-trim = Trim borders and extra margin
+scan-editor-trim = Trim borders and margins
 
 # Spoken name of the trim borders switch.
 scan-editor-trim-spoken = Trim borders
@@ -903,7 +903,7 @@ scan-editor-batch-heading = Batch
 scan-editor-batch-one = One scan
 
 # Choice of batch mode: a set number of runs.
-scan-editor-batch-several = Several runs
+scan-editor-batch-several = Several scans
 
 # Choice of batch mode: runs until the person stops.
 scan-editor-batch-until = Until I stop
@@ -912,19 +912,19 @@ scan-editor-batch-until = Until I stop
 scan-editor-batch-spoken = Batch mode
 
 # Label and spoken name of the number of runs choice.
-scan-editor-runs = Number of runs
+scan-editor-runs = Number of scans
 
 # Label above the pause between runs choice.
-scan-editor-pause = Pause between runs, seconds
+scan-editor-pause = Pause between scans (seconds)
 
 # Spoken name of the pause between runs choice.
-scan-editor-pause-spoken = Pause between runs
+scan-editor-pause-spoken = Pause between scans
 
 # Choice of pause: wait until the person presses Continue.
 scan-editor-pause-wait = Wait for me
 
 # Label and spoken name of the switch that puts all runs in one file.
-scan-editor-one-file = All runs in one file
+scan-editor-one-file = All scans in one file
 
 # Heading above what happens after scanning.
 scan-editor-after-heading = After scanning
@@ -945,10 +945,10 @@ scan-editor-pattern-spoken = File name pattern
 scan-editor-next-file = Next file: { $name }
 
 # Note listing the parts that can be used in a file name. The parts in curly brackets are typed as they are.
-scan-editor-parts = Parts you can use: { $parts }. A / makes a folder.
+scan-editor-parts = You can use these in the file name: { $parts }. Add a / to make a folder.
 
 # Label of the switch that clears the pages from the list after saving.
-scan-editor-clear-after = Clear the pages from the list afterwards
+scan-editor-clear-after = Clear pages from the list after saving
 
 # Spoken name of the clear pages switch.
 scan-editor-clear-after-spoken = Clear pages after saving
@@ -956,7 +956,7 @@ scan-editor-clear-after-spoken = Clear pages after saving
 ## Scanner problems (src/escl.rs)
 
 # Red words when the scanner did not answer. The reason follows.
-scan-escl-offline = The scanner did not answer. { $detail }
+scan-escl-offline = The scanner isn't responding. { $detail }
 
 # Red words when the scanner is busy.
 scan-escl-busy = The scanner is busy.
@@ -965,43 +965,43 @@ scan-escl-busy = The scanner is busy.
 scan-escl-no-paper = Put paper in the feeder.
 
 # Red words when paper is stuck.
-scan-escl-jam = Paper jam.
+scan-escl-jam = The paper has jammed.
 
 # Red words when the address is not on the local network.
 scan-escl-not-private = That address is not on your local network.
 
 # Red words for any other scanner problem. The reason follows.
-scan-escl-other = Scanner problem. { $detail }
+scan-escl-other = The scanner had a problem. { $detail }
 
 # Red words when a scan was stopped by the person.
 scan-escl-stopped = The scan was stopped.
 
 # Reason given when the scanner's address cannot be found.
-scan-escl-detail-no-address = No address.
+scan-escl-detail-no-address = There is no scanner address.
 
 # Reason given when the scanner answered with an error number.
-scan-escl-detail-answered = It answered { $code }.
+scan-escl-detail-answered = It replied with error { $code }.
 
 # Reason given when the scanner did not say what it can scan.
-scan-escl-detail-no-caps = It did not say what it can scan.
+scan-escl-detail-no-caps = It didn't report what it can scan.
 
 # Reason given when the scanner refused a scan, with its error number.
-scan-escl-detail-refused = It refused the scan ({ $code }).
+scan-escl-detail-refused = It couldn't start the scan (error { $code }).
 
 # Reason given when the scanner did not say where the scan job is.
-scan-escl-detail-no-job = It gave no job address.
+scan-escl-detail-no-job = The scanner didn't send the scan.
 
 # Reason given when the scanner stopped with an error number.
-scan-escl-detail-stopped = It stopped with { $code }.
+scan-escl-detail-stopped = It stopped with error { $code }.
 
 # Reason given when the scanner's answer could not be read.
-scan-escl-detail-broken = A broken answer.
+scan-escl-detail-broken = It sent a reply Trindle Scan couldn't read.
 
 # Reason: the scanner gave an address with characters this program will not send.
-scan-escl-detail-unsafe = It gave an address this program will not use.
+scan-escl-detail-unsafe = It sent an address that Trindle Scan can't safely use.
 
 # Reason: the scanner took far too long to send its answer.
-scan-escl-detail-too-slow = It took too long to answer.
+scan-escl-detail-too-slow = It took too long to respond.
 
 ## USB scanners (src/sane.rs, src/main.rs)
 
@@ -1009,36 +1009,36 @@ scan-escl-detail-too-slow = It took too long to answer.
 scan-scanners-usb = USB
 
 # Red words when a USB scanner is chosen but the computer lacks the scanner software.
-scan-sane-missing = USB scanners need scanner software (SANE) that is not on this computer.
+scan-sane-missing = USB scanners need the SANE scanner software, which isn't installed on this computer.
 
 # Red words when the system will not let the program use the USB scanner.
-scan-sane-denied = This program is not allowed to use the USB scanner. Allow Use scanners and USB devices for Trindle Scan in its permissions, then open it again.
+scan-sane-denied = Trindle Scan isn't allowed to use USB scanners. Switch on Use scanners and USB devices in its permissions, then open it again.
 
 # Red words when the scanner lid is open.
 scan-sane-cover = The scanner cover is open. Close it and try again.
 
 # Reason given when the USB scanner cannot be reached.
-scan-sane-io = Check the scanner is plugged in and switched on. A scanner plugged in after the program opened is found when it is opened again.
+scan-sane-io = Trindle Scan can't reach the scanner. Check it is plugged in and switched on. If you plugged it in after opening Trindle Scan, close Trindle Scan and open it again.
 
 # Red words when the scanner would not take one setting. { $what } is the scanner's own name for it.
-scan-sane-refused = The scanner would not accept its { $what } setting, so nothing was scanned.
+scan-sane-refused = The scanner didn't accept the { $what } setting, so nothing was scanned.
 
 # Red words when a USB scanner's name cannot be used.
-scan-sane-bad-device = The scanner's device name is not usable.
+scan-sane-bad-device = Trindle Scan can't use this scanner.
 
 # Red words when the scanner sends the picture in a form the program cannot read.
-scan-sane-frame = The scanner sent the picture in a form this program cannot read.
+scan-sane-frame = The scanner sent the picture in a form Trindle Scan can't read.
 
 ## Reading text for searchable PDFs (src/ocr.rs)
 
 # Reason given when the chosen language for reading text is not a plain language code.
-scan-ocr-bad-language = That language for reading text is not one the program knows.
+scan-ocr-bad-language = Trindle Scan can't read text in that language.
 
 # Reason given when reading the text of one page took too long.
 scan-ocr-too-slow = Reading the text on this page took too long.
 
 # Reason given when the text reader stopped with an error on a page.
-scan-ocr-failed = The text on this page could not be read.
+scan-ocr-failed = Trindle Scan couldn't read the text on this page.
 
 # Words on the bar while the text of the pages is read for a searchable PDF.
 scan-ocr-reading = Reading the text on page { $i } of { $n }
@@ -1047,7 +1047,7 @@ scan-ocr-reading = Reading the text on page { $i } of { $n }
 scan-ocr-cancelled = Saving was cancelled. The pages are still here.
 
 # Note under the bar when the program that reads text is not on this computer.
-scan-ocr-missing = Reading text needs the Tesseract program, which is not on this computer. Pages are saved without searchable text.
+scan-ocr-missing = To read text, Trindle Scan needs Tesseract, which isn't installed on this computer. Pages are saved without searchable text.
 
 # Note under the bar when some pages could not be read for text. The page numbers follow.
 scan-ocr-unread =
@@ -1066,13 +1066,13 @@ scan-editor-searchable = Make text searchable
 scan-editor-ocr-language = Language of the text
 
 # Label above the choice of a second language to read.
-scan-editor-ocr-second = Second language, if the pages use two
+scan-editor-ocr-second = Second language (optional)
 
 # Choice of second language: none.
 scan-editor-ocr-none = None
 
 # Note under the searchable text choice.
-scan-editor-ocr-note = Reading takes a few seconds a page. If a page cannot be read it is saved without the text.
+scan-editor-ocr-note = Reading text takes a few seconds a page. If Trindle Scan can't read the text on a page, it saves the page without searchable text.
 
 ## Zoom and crop shape in the viewer (src/main.rs)
 
@@ -1088,10 +1088,10 @@ scan-view-zoom-fit = Whole page
 scan-view-zoom-actual = Actual size
 
 # Note under the zoom buttons.
-scan-view-zoom-note = The mouse wheel also zooms. Drag the page to move it. The keys plus, minus and 0 zoom in, out and to the whole page.
+scan-view-zoom-note = You can also zoom with the mouse wheel and drag the page to move it. Plus and minus zoom in and out, and 0 shows the whole page.
 
 # Label and spoken name of the choice of shape the crop box keeps.
-scan-view-crop-shape = Shape of the crop
+scan-view-crop-shape = Crop shape
 
 # The shapes: free, square, and width to height as 4 to 3, 3 to 2 and 16 to 9.
 scan-view-crop-shape-free = Free
@@ -1122,5 +1122,5 @@ scan-close-discard = Discard and close
 scan-close-keep = Keep working
 
 # Printed in the terminal, not shown in a window, when the program is started without a desktop to draw on.
-scan-main-start-no-desktop = Trindle Scan: there is no desktop to open a window on.
-scan-main-start-no-window = Trindle Scan: the desktop would not open a window.
+scan-main-start-no-desktop = Trindle Scan can't open a window because no desktop is running.
+scan-main-start-no-window = Trindle Scan couldn't open a window on the desktop.

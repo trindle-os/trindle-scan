@@ -607,7 +607,7 @@ mod tests {
     fn a_short_row_is_refused_not_a_crash() {
         crate::words::ready();
         let bits = Params { format: FRAME_GRAY, last_frame: 1, bytes_per_line: 1, pixels_per_line: 16, lines: 1, depth: 1 };
-        assert!(matches!(jpeg_of(&bits, &[0xff]), Err(Fail::Other(w)) if w.contains("cannot read")));
+        assert!(matches!(jpeg_of(&bits, &[0xff]), Err(Fail::Other(w)) if w.contains("can't read")));
         let deep = Params { format: FRAME_RGB, last_frame: 1, bytes_per_line: 5, pixels_per_line: 1, lines: 1, depth: 16 };
         assert!(jpeg_of(&deep, &[0; 5]).is_err());
     }
@@ -618,14 +618,14 @@ mod tests {
         assert!(is_local("genesys:libusb:001:004") && is_local("test:0") && !is_local("v4l:/dev/video0"));
         assert!(!is_local("net:host:dev") && !is_local("airscan:e0:Printer") && !is_local("escl:http://x"));
         assert!(is_local("escl:http://localhost:60000/eSCL") && is_local("escl:http://127.0.0.1:60000") && is_local("escl:http://[::1]:60000") && !is_local("escl:http://localhost.example.com"));
-        assert!(matches!(device_name("a\0b"), Err(Fail::Other(w)) if w.contains("device name")));
+        assert!(matches!(device_name("a\0b"), Err(Fail::Other(w)) if w.contains("can't use this scanner")));
     }
 
     #[test]
     fn a_split_colour_frame_is_refused_in_plain_words() {
         crate::words::ready();
         let red = Params { format: 2, last_frame: 0, bytes_per_line: 2, pixels_per_line: 2, lines: 1, depth: 8 };
-        assert!(matches!(jpeg_of(&red, &[1, 2]), Err(Fail::Other(w)) if w.contains("cannot read")));
+        assert!(matches!(jpeg_of(&red, &[1, 2]), Err(Fail::Other(w)) if w.contains("can't read")));
     }
 
     #[test]

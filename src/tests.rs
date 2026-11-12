@@ -312,7 +312,7 @@ fn a_batch_of_runs_with_a_pause_makes_a_file_each() {
             false
         },
     );
-    assert!(app.borrow().note.contains("2 runs"));
+    assert!(app.borrow().note.contains("2 scans"));
     let mut names: Vec<String> = dir.read_dir().unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
     names.sort();
     assert_eq!(names, vec!["Run 01.pdf", "Run 02.pdf"]);
@@ -451,7 +451,7 @@ fn dropped_picture_files_become_pages() {
     let (items, failed) = load_pictures(vec![one, d.join("notes.txt")]);
     a.event(Event::Loaded(items, failed));
     assert_eq!(a.list.pages.len(), 1);
-    assert_eq!(a.note, "Added 1 picture. One file could not be read.");
+    assert_eq!(a.note, "Added 1 picture. Trindle Scan couldn't read one file.");
 }
 
 #[test]
@@ -879,4 +879,22 @@ fn a_split_pdf_save_that_fails_part_way_leaves_no_files() {
     );
     assert!(r.is_err());
     assert_eq!(std::fs::read_dir(&d).unwrap().count(), 0);
+}
+
+#[test]
+fn the_help_quotes_only_messages_the_screen_still_shows() {
+    let screen = include_str!("../share/lang/en/scan.ftl").split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut checked = 0;
+    for line in include_str!("../docs/HELP.md").lines().filter(|l| l.starts_with("**\"")) {
+        for quote in line.split('"').skip(1).step_by(2) {
+            for part in quote.split("...").flat_map(|p| p.split(|c: char| c.is_ascii_digit() || c == 'N')) {
+                let part = part.trim().trim_end_matches(['.', ':']).trim();
+                if part.len() > 8 {
+                    assert!(screen.contains(part), "the help quotes \"{part}\" but the screen no longer says it");
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 20);
 }
